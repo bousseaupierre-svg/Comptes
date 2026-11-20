@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Comptes">
+<title>Comptes</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f3f5f6;--sf:#fff;--ink:#14282d;--mu:#5c6c72;--ln:#dde3e5;--ok:#1f7a54;--late:#c2412b;--ac:#0f4c5c;--on:#fff;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1a1e;--sf:#16262b;--ink:#e8f0f2;--mu:#93a6ad;--ln:#26383e;--ok:#4cc38a;--late:#ff8a73;--ac:#7cc4d6;--on:#0e1a1e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1a1e;--sf:#16262b;--ink:#e8f0f2;--mu:#93a6ad;--ln:#26383e;--ok:#4cc38a;--late:#ff8a73;--ac:#7cc4d6;--on:#0e1a1e;color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:400 16px/1.4 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+main{max-width:600px;margin:0 auto;padding:0 16px 40px}
+[hidden]{display:none!important}
+h1{font-size:24px;margin:40px 0 4px}h2{font-size:18px;margin:0}
+.mu{color:var(--mu);font-size:14px}
+input,select{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--ln);border-radius:10px;background:var(--sf);color:var(--ink);font:inherit;font-size:16px;margin:6px 0 10px}
+.btn{display:block;width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--ac);background:var(--ac);color:var(--on);font:600 15px inherit;font-family:inherit;text-align:center;cursor:pointer;margin-top:8px}
+.btn.alt{background:transparent;color:var(--ac)}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:6px;padding:10px 0;border-bottom:1px solid var(--ln)}
+.tabs button{flex:1;padding:9px 4px;border:1px solid var(--ln);border-radius:10px;background:var(--sf);color:var(--ink);font:500 14px inherit;font-family:inherit;cursor:pointer}
+.tabs button.on{background:var(--ac);color:var(--on);border-color:var(--ac)}
+.nav{display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px}
+.nav button{width:40px;height:40px;border:1px solid var(--ln);border-radius:50%;background:var(--sf);color:var(--ink);font-size:20px;cursor:pointer}
+.chips{display:flex;gap:6px;margin-bottom:6px}
+.chips button{padding:6px 12px;border:1px solid var(--ln);border-radius:16px;background:transparent;color:var(--ink);font:500 13px inherit;font-family:inherit;cursor:pointer}
+.chips button.on{background:var(--ink);color:var(--bg)}
+ul{list-style:none;margin:0;padding:0}
+li{display:grid;grid-template-columns:46px 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--ln);cursor:pointer}
+.dy{text-align:center;font-size:13px;color:var(--mu);line-height:1.2}.dy b{display:block;font-size:18px;color:var(--ink)}
+.lb{min-width:0}.lb span{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb small{font-size:13px;color:var(--mu)}
+li.todo .lb small{color:var(--late);font-weight:600}
+li.sug .lb small{color:var(--ac);font-style:italic}
+.am{font-weight:600;text-align:right}.am.p{color:var(--ok)}
+.okb{margin-top:4px;padding:2px 8px;border:1px solid var(--ac);border-radius:12px;background:transparent;color:var(--ac);font:600 12px inherit;font-family:inherit;cursor:pointer}
+dialog{border:0;border-radius:16px;background:var(--sf);color:var(--ink);padding:20px;width:min(92vw,400px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog label{display:block;font-size:14px;color:var(--mu)}
+dialog .row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:14px;color:var(--ink)}
+dialog .row input{width:auto;margin:0}
+#log{white-space:pre-wrap;font-size:14px;margin-top:14px;color:var(--mu)}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
+#toast.on{opacity:1}
+button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<section id="lg" hidden>
+ <h1>Comptes</h1><p class="mu">Connectez-vous avec votre compte.</p>
+ <input id="em" type="email" placeholder="E-mail" autocomplete="username">
+ <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+ <button class="btn" id="go">Se connecter</button><p class="mu" id="lm"></p>
+</section>
+<section id="ap" hidden>
+ <div class="tabs"><button id="t1" class="on">Transactions</button><button id="t2">Importer</button><button id="t3">Déconnexion</button></div>
+ <div id="v1">
+  <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
+  <div class="chips"><button data-f="all" class="on">Mois</button><button data-f="todo" id="c1">À compléter</button><button data-f="sug" id="c2">Suggérées</button></div>
+  <p class="mu" id="info"></p><ul id="ls"></ul>
+ </div>
+ <div id="v2" hidden>
+  <h2>Importer</h2>
+  <p class="mu">Relevé bancaire (.xlsx, 2e onglet), transactions.csv ou regles.csv. Les lignes déjà présentes sont ignorées ; les nouvelles sont catégorisées avec vos règles.</p>
+  <label class="btn" for="fi">Choisir un fichier</label><input id="fi" type="file" accept=".xlsx,.csv,.txt" hidden>
+  <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button>
+  <div id="log"></div>
+ </div>
+</section>
+</main>
+<dialog id="sh">
+ <h2 id="sl" style="font-size:15px;word-break:break-word"></h2><p class="mu" id="sa"></p>
+ <label>Catégorie<input id="sc" list="dc" autocomplete="off"></label>
+ <label>Sous-catégorie<input id="su" list="ds" autocomplete="off"></label>
+ <datalist id="dc"></datalist><datalist id="ds"></datalist>
+ <div class="row"><input type="checkbox" id="sim"><label for="sim" style="color:inherit">Appliquer aux lignes similaires (<span id="sn">0</span>)</label></div>
+ <div class="row"><input type="checkbox" id="ru"><label for="ru" style="color:inherit">Créer une règle pour le mot-clé :</label></div>
+ <input id="rk">
+ <button class="btn" id="ssv">Enregistrer</button><button class="btn alt" id="sx">Fermer</button>
+</dialog>
+<div id="toast" role="status"></div>
+<script>
+const SB=supabase.createClient("https://jyhnuezscbmlnknydbmk.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5aG51ZXpzY2JtbG5rbnlkYm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxNjQ0ODMsImV4cCI6MjExMDc0MDQ4M30.1vYFccx7o8iFXLplcQQ6ca1jqXpc9_JWui-i2WdxhpA");
+const $=id=>document.getElementById(id);
+const MO=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+const eur=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
+const pad=n=>String(n).padStart(2,"0"),ymd=(y,m,d)=>y+"-"+pad(m+1)+"-"+pad(d);
+const toast=m=>{const e=$("toast");e.textContent=m;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),3000)};
+const log=m=>{$("log").textContent=m};
+const now=new Date();let Y=now.getFullYear(),M=now.getMonth(),F="all",ROWS=[],REF=[],RULES=[],SUG=new Map(),cur=null;
+const SW=new Set(["CARTE","PAIEMENT","CB","PRLV","SEPA","VIR","INST"]);
+const norm=l=>l.toUpperCase().replace(/\d{2}\/\d{2}\/\d{2,4}/g," ").replace(/[0-9]+/g," ").replace(/[^A-Z ]/g," ").split(/\s+/).filter(w=>w.length>1&&!SW.has(w)).slice(0,2).join(" ");
+async function all(q){let o=[],f=0;for(;;){const{data,error}=await q().range(f,f+999);if(error)throw error;o=o.concat(data);if(data.length<1000)return o;f+=1000}}
+async function loadRef(){
+ REF=await all(()=>SB.from("transactions").select("id,libelle,categorie,sous_categorie,statut_cat").order("id"));
+ RULES=(await all(()=>SB.from("regles").select("*").order("id"))).sort((a,b)=>b.mot_cle.length-a.mot_cle.length);
+ const m=new Map();
+ for(const r of REF){if(!r.categorie||r.statut_cat==="suggeree")continue;const k=norm(r.libelle);if(!k)continue;
+  const kk=r.categorie+"\u0001"+(r.sous_categorie||"");if(!m.has(k))m.set(k,new Map());m.get(k).set(kk,(m.get(k).get(kk)||0)+1)}
+ SUG=m;
+ $("dc").innerHTML=[...new Set(REF.map(r=>r.categorie).filter(Boolean))].sort().map(c=>`<option value="${c.replace(/"/g,"&quot;")}">`).join("")}
+function classify(lib){const u=lib.toUpperCase();
+ for(const r of RULES)if(u.includes(r.mot_cle.toUpperCase()))return{categorie:r.categorie,sous_categorie:r.sous_categorie||null,statut_cat:"regle"};
+ const c=SUG.get(norm(lib));
+ if(c){let t=0,b=null,bn=0;for(const[k,n]of c){t+=n;if(n>bn){bn=n;b=k}}
+  if(t>=2){const[ca,su]=b.split("\u0001");return{categorie:ca,sous_categorie:su||null,statut_cat:"suggeree"}}}
+ return{categorie:null,sous_categorie:null,statut_cat:"a_completer"}}
+async function counts(){
+ const q=s=>SB.from("transactions").select("id",{count:"exact",head:true}).eq("statut_cat",s);
+ const[a,b]=await Promise.all([q("a_completer"),q("suggeree")]);
+ $("c1").textContent="À compléter ("+(a.count||0)+")";$("c2").textContent="Suggérées ("+(b.count||0)+")"}
+async function loadView(){
+ let q=SB.from("transactions").select("*");
+ if(F==="all"){const s=ymd(Y,M,1),e=ymd(M===11?Y+1:Y,(M+1)%12,1);q=q.gte("date",s).lt("date",e)}
+ else q=q.eq("statut_cat",F==="todo"?"a_completer":"suggeree");
+ const{data,error}=await q.order("date",{ascending:false}).order("libelle").limit(1000);
+ if(error){toast("Erreur : "+error.message);return}
+ ROWS=data;render();counts()}
+function render(){
+ $("mt").textContent=F==="all"?MO[M][0].toUpperCase()+MO[M].slice(1)+" "+Y:(F==="todo"?"À compléter":"Suggérées");
+ $("pv").hidden=$("nx").hidden=F!=="all";
+ const tot=ROWS.reduce((s,r)=>s+Number(r.montant),0);
+ $("info").textContent=ROWS.length+" lignes"+(F==="all"?" · solde du mois "+eur(tot):"");
+ $("ls").innerHTML=ROWS.map((r,i)=>{const d=new Date(r.date+"T12:00:00"),st=r.statut_cat;
+  const sub=st==="a_completer"?"À compléter":(st==="suggeree"?"Suggérée : ":"")+r.categorie+(r.sous_categorie?" › "+r.sous_categorie:"");
+  return`<li tabindex="0" data-i="${i}" class="${st==="a_completer"?"todo":st==="suggeree"?"sug":""}"><div class="dy"><b>${d.getDate()}</b>${MO[d.getMonth()].slice(0,4)}.</div><div class="lb"><span>${r.libelle.replace(/</g,"&lt;")}</span><small>${sub}</small></div><div class="am ${r.montant>0?"p":""}">${eur(r.montant)}${st==="suggeree"?`<br><button class="okb" data-ok="${i}">Confirmer</button>`:""}</div></li>`}).join("")}
+async function upd(ids,v){for(let i=0;i<ids.length;i+=80){const{error}=await SB.from("transactions").update(v).in("id",ids.slice(i,i+80));if(error)throw error}}
+$("ls").addEventListener("click",async ev=>{
+ const ok=ev.target.closest("[data-ok]");
+ if(ok){const r=ROWS[ok.dataset.ok];await upd([r.id],{statut_cat:"manuelle"});await loadRef();loadView();return}
+ const li=ev.target.closest("li");if(!li)return;cur=ROWS[li.dataset.i];
+ $("sl").textContent=cur.libelle;$("sa").textContent=cur.date+" · "+eur(cur.montant);
+ $("sc").value=cur.categorie||"";$("su").value=cur.sous_categorie||"";subs();
+ const k=norm(cur.libelle),n=REF.filter(r=>r.id!==cur.id&&r.statut_cat!=="manuelle"&&norm(r.libelle)===k).length;
+ $("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
+function subs(){const c=$("sc").value.trim();$("ds").innerHTML=[...new Set(REF.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))].sort().map(s=>`<option value="${s.replace(/"/g,"&quot;")}">`).join("")}
+$("sc").addEventListener("input",subs);
+$("sx").onclick=()=>$("sh").close();
+$("ssv").onclick=async()=>{const c=$("sc").value.trim(),s=$("su").value.trim();if(!c){toast("Choisissez une catégorie");return}
+ try{let ids=[cur.id];
+  if($("sim").checked){const k=norm(cur.libelle);ids=ids.concat(REF.filter(r=>r.id!==cur.id&&r.statut_cat!=="manuelle"&&norm(r.libelle)===k).map(r=>r.id))}
+  await upd(ids,{categorie:c,sous_categorie:s||null,statut_cat:"manuelle"});
+  const kw=$("rk").value.trim();
+  if($("ru").checked&&kw){const{error}=await SB.from("regles").insert({mot_cle:kw,categorie:c,sous_categorie:s||null});if(error)throw error}
+  $("sh").close();toast(ids.length+" ligne(s) mise(s) à jour");await loadRef();loadView()}catch(e){toast("Erreur : "+e.message)}};
+document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset.f;document.querySelectorAll(".chips button").forEach(x=>x.classList.toggle("on",x===b));loadView()});
+$("pv").onclick=()=>{M--;if(M<0){M=11;Y--}loadView()};
+$("nx").onclick=()=>{M++;if(M>11){M=0;Y++}loadView()};
+function tab(n){$("v1").hidden=n!==1;$("v2").hidden=n!==2;$("t1").classList.toggle("on",n===1);$("t2").classList.toggle("on",n===2)}
+$("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
+$("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
+function csv(t){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
+ for(let i=0;i<t.length;i++){const ch=t[i];
+  if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
+  else if(ch==='"')q=true;else if(ch===","){r.push(c);c=""}
+  else if(ch==="\n"){r.push(c.replace(/\r$/,""));R.push(r);r=[];c=""}else c+=ch}
+ if(c||r.length){r.push(c);R.push(r)}return R.filter(x=>x.length>1)}
+async function ins(rows,onConflict){let n=0;
+ for(let i=0;i<rows.length;i+=300){const ch=rows.slice(i,i+300);
+  const{error}=await SB.from("transactions").upsert(ch,{onConflict,ignoreDuplicates:true});if(error)throw error;n+=ch.length;log("Envoi… "+n+"/"+rows.length)}}
+async function impBank(buf){
+ const wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets[wb.SheetNames[1]];
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+ const hi=rows.findIndex(r=>r[0]==="Date");if(hi<0)throw new Error("Colonne « Date » introuvable (2e onglet attendu)");
+ const num=v=>{const n=parseFloat(String(v??"").replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n};
+ const L=[];
+ for(const r of rows.slice(hi+1)){if(typeof r[1]!=="number")continue;
+  const date=new Date(Math.round((r[1]-25569)*864e5)).toISOString().slice(0,10),montant=Math.round((num(r[3])+num(r[4]))*100)/100;
+  if(!montant||!r[2])continue;L.push({date,libelle:String(r[2]).trim(),montant})}
+ if(!L.length)throw new Error("Aucune opération trouvée");
+ L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+ const ex=await all(()=>SB.from("transactions").select("id,date,montant").gte("date",L[0].date).lte("date",L[L.length-1].date).order("id"));
+ const have=new Map();for(const e of ex){const k=e.date+"|"+Number(e.montant).toFixed(2);have.set(k,(have.get(k)||0)+1)}
+ const seen=new Map(),N=[],cnt={regle:0,suggeree:0,a_completer:0};
+ for(const l of L){const k=l.date+"|"+l.montant.toFixed(2),i=seen.get(k)||0;seen.set(k,i+1);
+  if(i<(have.get(k)||0))continue;
+  const c=classify(l.libelle);cnt[c.statut_cat]++;
+  N.push({...l,...c,cle_doublon:k.replace("|","|"+l.libelle+"|")+"|b"+i})}
+ if(N.length)await ins(N,"cle_doublon");
+ await loadRef();await counts();
+ log(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer)}
+async function impCsv(txt){
+ const R=csv(txt),h=R[0].map(s=>s.trim()),ix=n=>h.indexOf(n);
+ if(ix("cle_doublon")>=0){
+  const rows=R.slice(1).map(r=>({date:r[ix("date")],libelle:r[ix("libelle")],montant:parseFloat(r[ix("montant")]),categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null,statut_cat:r[ix("statut_cat")]||"a_completer",cle_doublon:r[ix("cle_doublon")]})).filter(r=>r.date&&!isNaN(r.montant));
+  await ins(rows,"cle_doublon");await loadRef();await counts();log(rows.length+" lignes traitées (les doublons sont ignorés).")}
+ else if(ix("mot_cle")>=0){
+  const have=new Set(RULES.map(r=>r.mot_cle.toUpperCase()));
+  const rows=R.slice(1).filter(r=>r[ix("mot_cle")]&&!have.has(r[ix("mot_cle")].toUpperCase())).map(r=>({mot_cle:r[ix("mot_cle")],categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null}));
+  if(rows.length){const{error}=await SB.from("regles").insert(rows);if(error)throw error}
+  await loadRef();log(rows.length+" règles ajoutées ("+RULES.length+" au total).")}
+ else throw new Error("Format CSV non reconnu")}
+$("fi").onchange=async e=>{const f=e.target.files[0];if(!f)return;log("Lecture de "+f.name+"…");
+ try{if(/\.xlsx$/i.test(f.name))await impBank(await f.arrayBuffer());else await impCsv(await f.text())}catch(x){log("Erreur : "+x.message)}
+ e.target.value=""};
+$("rc").onclick=async()=>{try{await loadRef();const g=new Map();
+ for(const r of REF){if(r.statut_cat!=="a_completer"&&r.statut_cat!=="suggeree")continue;const c=classify(r.libelle);
+  if(c.statut_cat==="a_completer")continue;const k=[c.categorie,c.sous_categorie||"",c.statut_cat].join("\u0001");if(!g.has(k))g.set(k,[]);g.get(k).push(r.id)}
+ let n=0;for(const[k,ids]of g){const[ca,su,st]=k.split("\u0001");await upd(ids,{categorie:ca,sous_categorie:su||null,statut_cat:st});n+=ids.length}
+ await loadRef();await counts();log(n+" lignes recatégorisées.")}catch(e){log("Erreur : "+e.message)}};
+function show(on){$("lg").hidden=on;$("ap").hidden=!on}
+$("go").onclick=async()=>{$("lm").textContent="";
+ const{error}=await SB.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
+ if(error){$("lm").textContent="Connexion impossible : vérifiez e-mail et mot de passe.";return}start()};
+async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}loadView()}
+SB.auth.getSession().then(({data})=>data.session?start():show(false));
+</script>
+</body>
+</html>
