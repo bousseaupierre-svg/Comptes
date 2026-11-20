@@ -48,6 +48,14 @@ dialog .row input{width:auto;margin:0}
 #log{white-space:pre-wrap;font-size:14px;margin-top:14px;color:var(--mu)}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
 #toast.on{opacity:1}
+.tabs button{font-size:13px;padding:9px 2px}
+.big{margin-top:6px;font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.bar2{height:6px;border-radius:3px;background:var(--ln);margin:10px 0 6px;overflow:hidden}.bar2 i{display:block;height:100%;background:var(--ok);transition:width .3s}
+li.f{grid-template-columns:44px 1fr auto 36px}
+li.f.late .lb small{color:var(--late);font-weight:600}li.f.ok .lb small{color:var(--ok)}li.f.ok .am{color:var(--mu)}
+.ck{width:32px;height:32px;border-radius:50%;border:2px solid var(--ln);background:transparent;color:transparent;font-size:16px;cursor:pointer;padding:0}
+li.ok .ck{background:var(--ok);border-color:var(--ok);color:var(--on)}li.late .ck{border-color:var(--late)}
+li.sel{background:var(--sf)}.mb{height:6px;border-radius:3px;background:var(--late);margin-top:4px;opacity:.75}
 button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 </style>
 </head>
@@ -60,7 +68,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="go">Se connecter</button><p class="mu" id="lm"></p>
 </section>
 <section id="ap" hidden>
- <div class="tabs"><button id="t1" class="on">Transactions</button><button id="t2">Importer</button><button id="t3">Déconnexion</button></div>
+ <div class="tabs"><button id="t1" class="on">Opérations</button><button id="t4">Fixes</button><button id="t5">Analyse</button><button id="t2">Import</button><button id="t3">Quitter</button></div>
  <div id="v1">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
   <div class="chips"><button data-f="all" class="on">Mois</button><button data-f="todo" id="c1">À compléter</button><button data-f="sug" id="c2">Suggérées</button></div>
@@ -72,6 +80,18 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <label class="btn" for="fi">Choisir un fichier</label><input id="fi" type="file" accept=".xlsx,.csv,.txt" hidden>
   <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button>
   <div id="log"></div>
+ </div>
+ <div id="v4" hidden>
+  <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
+  <div class="big" id="fr"></div><div class="mu">à payer d’ici la fin du mois</div>
+  <div class="bar2"><i id="fg"></i></div><div class="mu" id="fs"></div>
+  <ul id="fl"></ul>
+  <p class="mu">Les charges sont pointées automatiquement d’après vos opérations. Appuyez sur le rond pour pointer ou annuler une charge manuellement.</p>
+ </div>
+ <div id="v5" hidden>
+  <div class="nav"><button id="yp" aria-label="Année précédente">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Année suivante">›</button></div>
+  <p class="mu" id="yt"></p><ul id="ym"></ul>
+  <h2 id="yh" style="margin:18px 0 4px;font-size:16px"></h2><ul id="yc"></ul>
  </div>
 </section>
 </main>
@@ -153,8 +173,70 @@ $("ssv").onclick=async()=>{const c=$("sc").value.trim(),s=$("su").value.trim();i
 document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset.f;document.querySelectorAll(".chips button").forEach(x=>x.classList.toggle("on",x===b));loadView()});
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}loadView()};
-function tab(n){$("v1").hidden=n!==1;$("v2").hidden=n!==2;$("t1").classList.toggle("on",n===1);$("t2").classList.toggle("on",n===2)}
+function tab(n){[1,2,4,5].forEach(v=>{$("v"+v).hidden=v!==n;$("t"+v).classList.toggle("on",v===n)})}
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
+$("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);loadAn()};
+const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
+const SEED=[
+{id:"frais",libelle:"Frais bancaires",montant:-9.3,jour:1,mots_cles:["COTIS EUC"]},
+{id:"navigo",libelle:"Navigo",montant:-90.8,jour:3,mois:[1,2,3,4,5,6,7,8,10,11,12],mots_cles:["NAVIGO"]},
+{id:"assp",libelle:"Assurance prêt",montant:-16.49,jour:5,mots_cles:["KEREIS"]},
+{id:"asst",libelle:"Assurance trimestrielle",montant:-50.73,jour:5,mois:[2,5,8,11],mots_cles:["MULTI IMPACT"]},
+{id:"copro",libelle:"Charge copropriété",montant:-300,jour:5,variable:true,mots_cles:["MATERA"]},
+{id:"pret",libelle:"Prêt immobilier",montant:-775,jour:7,mots_cles:["CAP+IN"]},
+{id:"ptz",libelle:"PTZ",montant:-333.33,jour:7,mots_cles:["PRET CAP 36044"]},
+{id:"loyer",libelle:"Loyer Saint-Denis",montant:1410,jour:8,variable:true,mots_cles:["ADHOC GESTION"]},
+{id:"fonc",libelle:"Taxe foncière",montant:-206,jour:15,mois:[1,2,3,4,5,6,7,8,9,10],mots_cles:["DIRECTION GENERALE","DGFIP"]},
+{id:"tel",libelle:"Téléphone",montant:-17.99,jour:19,mots_cles:["ORANGE"]},
+{id:"sal",libelle:"Salaire",montant:4730,jour:25,variable:true,mots_cles:["KLESIA"]},
+{id:"trade",libelle:"Trade Republic",montant:-105,jour:30,mots_cles:["TRADEREPUBLIC"]},
+{id:"btc",libelle:"Achat crypto",montant:-30,jour_semaine:5,mots_cles:["KRAKEN"]}];
+let CF=[],FT=[],PT={},FO=[];const FM={y:now.getFullYear(),m:now.getMonth()};
+function occF(y,m,cf){const o=[],dim=new Date(y,m+1,0).getDate();
+ for(const c of cf){if(c.mois&&!c.mois.includes(m+1))continue;
+  if(c.jour_semaine!=null){let j=0;for(let d=1;d<=dim;d++){const dt=new Date(y,m,d);if(dt.getDay()===c.jour_semaine)o.push({c,dt,i:j++})}}
+  else o.push({c,dt:new Date(y,m,Math.min(c.jour,dim)),i:0})}
+ o.forEach(x=>x.k=y+"-"+m+"|"+x.c.id+"|"+x.i);return o.sort((a,b)=>a.dt-b.dt||a.c.id.localeCompare(b.c.id))}
+async function loadCF(){try{
+ let{data,error}=await SB.from("charges_fixes").select("*").eq("actif",true);if(error)throw error;
+ if(!data.length){const r=await SB.from("charges_fixes").insert(SEED);if(r.error)throw r.error;data=(await SB.from("charges_fixes").select("*").eq("actif",true)).data}
+ CF=data;const{y,m}=FM;
+ const a=dstr(new Date(y,m,-6)),b=dstr(new Date(y,m+1,8));
+ FT=await all(()=>SB.from("transactions").select("date,libelle,montant").gte("date",a).lt("date",b).order("id"));
+ const p=await SB.from("pointages").select("*").like("cle",y+"-"+m+"|%");PT={};(p.data||[]).forEach(r=>PT[r.cle]=r);
+ FO=occF(y,m,CF);const used=new Set();
+ for(const x of FO){const c=x.c,tol=c.jour_semaine!=null?3:7;
+  const ca=FT.map((t,i)=>({t,i,d:Math.abs(new Date(t.date+"T12:00:00")-x.dt)/864e5})).filter(o=>!used.has(o.i)&&o.d<=tol&&(Number(o.t.montant)<0)===(Number(c.montant)<0)&&c.mots_cles.some(k=>o.t.libelle.toUpperCase().includes(k.toUpperCase()))).sort((u,v)=>u.d-v.d)[0];
+  if(ca){used.add(ca.i);x.p={a:Number(ca.t.montant),d:ca.t.date,auto:1}}else if(PT[x.k])x.p={a:Number(PT[x.k].montant),d:PT[x.k].date}}
+ renderCF()}catch(e){toast("Erreur : "+e.message)}}
+function renderCF(){const t=new Date();t.setHours(0,0,0,0);let due=0,paid=0,rest=0,inc=0,got=0,h="";
+ for(const x of FO){const p=x.p,e=Number(x.c.montant);
+  if(e<0){if(p){paid-=p.a;due-=p.a}else{rest-=e;due-=e}}else{if(p){got+=p.a;inc+=p.a}else inc+=e}
+  const late=!p&&x.dt<t,st=p?"Passée le "+new Date(p.d+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+(p.auto?" · relevé":""):late?"En retard":"À venir";
+  h+=`<li class="f ${p?"ok":late?"late":""}" data-k="${x.k}"><div class="dy"><b>${x.dt.getDate()}</b>${WD[x.dt.getDay()]}</div><div class="lb"><span>${x.c.libelle}</span><small>${st}</small></div><div class="am">${(x.c.variable&&!p?"≈ ":"")+eur(p?p.a:e)}</div><button class="ck" aria-label="Pointer">✓</button></li>`}
+ $("fl").innerHTML=h;$("fm").textContent=MO[FM.m][0].toUpperCase()+MO[FM.m].slice(1)+" "+FM.y;
+ $("fr").textContent=eur(rest);$("fg").style.width=(due?Math.min(100,paid/due*100):0)+"%";
+ $("fs").textContent="Payé "+eur(paid)+" sur "+eur(due)+" · Revenus "+eur(got)+" sur "+eur(inc)}
+$("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(!li)return;const x=FO.find(z=>z.k===li.dataset.k);
+ if(x.p&&x.p.auto){toast("Pointée automatiquement d’après le relevé");return}
+ const r=x.p?await SB.from("pointages").delete().eq("cle",x.k):await SB.from("pointages").insert({cle:x.k,montant:x.c.montant,date:dstr(x.dt)});
+ if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
+$("fp").onclick=()=>{FM.m--;if(FM.m<0){FM.m=11;FM.y--}loadCF()};
+$("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
+let AY=now.getFullYear(),AM=null,AN=[];
+async function loadAn(){try{
+ const rows=await all(()=>SB.from("transactions").select("date,montant,categorie").gte("date",AY+"-01-01").lt("date",(AY+1)+"-01-01").order("id"));
+ AN=Array.from({length:12},()=>({i:0,o:0,c:{}}));
+ for(const r of rows){const m=+r.date.slice(5,7)-1,v=Number(r.montant),k=r.categorie||"Non classé";if(v>0)AN[m].i+=v;else AN[m].o+=v;AN[m].c[k]=(AN[m].c[k]||0)+v}
+ renderAn()}catch(e){toast("Erreur : "+e.message)}}
+function renderAn(){const S=f=>AN.reduce((s,x)=>s+f(x),0),I=S(x=>x.i),O=S(x=>x.o),mx=Math.max(...AN.map(x=>-x.o),1);
+ $("yy").textContent=AY;$("yt").textContent="Revenus "+eur(I)+" · Dépenses "+eur(-O)+" · Balance "+eur(I+O);
+ $("ym").innerHTML=AN.map((x,i)=>`<li class="${AM===i?"sel":""}" data-m="${i}"><div class="dy"><b>${MO[i].slice(0,3)}</b></div><div class="lb"><span>Dépenses ${eur(-x.o)}</span><div class="mb" style="width:${-x.o/mx*100}%"></div></div><div class="am ${x.i+x.o>0?"p":""}">${eur(x.i+x.o)}</div></li>`).join("");
+ const C={};AN.forEach((x,i)=>{if(AM!==null&&AM!==i)return;for(const k in x.c)C[k]=(C[k]||0)+x.c[k]});
+ $("yh").textContent="Par catégorie · "+(AM===null?"toute l’année":MO[AM]);
+ $("yc").innerHTML=Object.entries(C).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([k,v])=>`<li style="grid-template-columns:1fr auto"><div class="lb"><span>${k}</span></div><div class="am ${v>0?"p":""}">${eur(v)}</div></li>`).join("")}
+$("ym").addEventListener("click",ev=>{const li=ev.target.closest("li");if(!li)return;const i=+li.dataset.m;AM=AM===i?null:i;renderAn()});
+$("yp").onclick=()=>{AY--;AM=null;loadAn()};$("yn").onclick=()=>{AY++;AM=null;loadAn()};
 $("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
 function csv(t){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
  for(let i=0;i<t.length;i++){const ch=t[i];
@@ -208,7 +290,7 @@ $("rc").onclick=async()=>{try{await loadRef();const g=new Map();
 function show(on){$("lg").hidden=on;$("ap").hidden=!on}
 $("go").onclick=async()=>{$("lm").textContent="";
  const{error}=await SB.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
- if(error){$("lm").textContent="Connexion impossible : vérifiez e-mail et mot de passe.";return}start()};
+ if(error){$("lm").textContent="Connexion impossible : "+error.message+(error.status?" (code "+error.status+")":"");return}start()};
 async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}loadView()}
 SB.auth.getSession().then(({data})=>data.session?start():show(false));
 </script>
