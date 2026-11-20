@@ -118,7 +118,7 @@ const now=new Date();let Y=now.getFullYear(),M=now.getMonth(),F="all",ROWS=[],RE
 const SW=new Set(["CARTE","PAIEMENT","CB","PRLV","SEPA","VIR","INST"]);
 const norm=l=>l.toUpperCase().replace(/\d{2}\/\d{2}\/\d{2,4}/g," ").replace(/[0-9]+/g," ").replace(/[^A-Z ]/g," ").split(/\s+/).filter(w=>w.length>1&&!SW.has(w)).slice(0,2).join(" ");
 async function all(q){let o=[],f=0;for(;;){const{data,error}=await q().range(f,f+999);if(error)throw error;o=o.concat(data);if(data.length<1000)return o;f+=1000}}
-async function loadRef(){
+async function loadRef(){SYN=false;
  REF=await all(()=>SB.from("transactions").select("id,libelle,categorie,sous_categorie,statut_cat").order("id"));
  RULES=(await all(()=>SB.from("regles").select("*").order("id"))).sort((a,b)=>b.mot_cle.length-a.mot_cle.length);
  const m=new Map();
@@ -197,9 +197,37 @@ function occF(y,m,cf){const o=[],dim=new Date(y,m+1,0).getDate();
   if(c.jour_semaine!=null){let j=0;for(let d=1;d<=dim;d++){const dt=new Date(y,m,d);if(dt.getDay()===c.jour_semaine)o.push({c,dt,i:j++})}}
   else o.push({c,dt:new Date(y,m,Math.min(c.jour,dim)),i:0})}
  o.forEach(x=>x.k=y+"-"+m+"|"+x.c.id+"|"+x.i);return o.sort((a,b)=>a.dt-b.dt||a.c.id.localeCompare(b.c.id))}
+let SYN=false;
+const med=a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2};
+async function syncCF(){try{
+ const since=dstr(new Date(now.getFullYear()-1,now.getMonth(),now.getDate()));
+ const tx=await all(()=>SB.from("transactions").select("date,libelle,montant").eq("categorie","Fixe").gte("date",since).order("id"));
+ const ch=(await SB.from("charges_fixes").select("*")).data||[],used=new Set();
+ const mt=(c,t)=>(Number(t.montant)<0)===(Number(c.montant)<0)&&c.mots_cles.some(k=>t.libelle.toUpperCase().includes(k.toUpperCase()));
+ for(const c of ch){const m=tx.filter(t=>mt(c,t)).sort((a,b)=>a.date<b.date?1:-1);m.forEach(t=>used.add(t));
+  if(c.ignore)continue;const u={};
+  if(m.length){if(!c.actif)u.actif=true;
+   if(c.auto!==false){const sg=c.montant<0?-1:1,v=c.variable?med(m.slice(0,3).map(t=>Math.abs(t.montant))):Math.abs(m[0].montant);
+    if(Math.abs(sg*v-c.montant)>0.005)u.montant=Math.round(sg*v*100)/100;
+    if(c.jour_semaine==null){const j=Math.round(med(m.slice(0,6).map(t=>+t.date.slice(8))));if(j!==c.jour)u.jour=j}}}
+  else if(c.actif)u.actif=false;
+  if(Object.keys(u).length)await SB.from("charges_fixes").update(u).eq("id",c.id)}
+ const g={};
+ for(const t of tx){if(used.has(t))continue;const n=norm(t.libelle);if(n.length<3)continue;(g[n+(t.montant<0?"-":"+")]=g[n+(t.montant<0?"-":"+")]||[]).push(t)}
+ let nw=0;
+ for(const k in g){const a=g[k].sort((x,y)=>x.date<y.date?1:-1);if(a.length<2)continue;
+  const key=k.slice(0,-1),U=t=>t.libelle.toUpperCase();
+  const kw=a.every(t=>U(t).includes(key))?key:key.split(" ")[0];if(!a.every(t=>U(t).includes(kw)))continue;
+  const mo=[...new Set(a.map(t=>+t.date.slice(5,7)))].sort((x,y)=>x-y);
+  const gap=(+a[0].date.slice(0,4)*12+ +a[0].date.slice(5,7))-(+a[1].date.slice(0,4)*12+ +a[1].date.slice(5,7));
+  const r=await SB.from("charges_fixes").insert({id:"auto-"+key.toLowerCase().replace(/ /g,"-")+(k.endsWith("-")?"":"-cr"),libelle:key[0]+key.slice(1).toLowerCase(),montant:Number(a[0].montant),jour:Math.round(med(a.slice(0,6).map(t=>+t.date.slice(8)))),mois:(mo.length>=9||gap<=1)?null:mo,mots_cles:[kw],variable:false,actif:true});
+  if(!r.error)nw++}
+ if(nw)toast(nw+" nouvelle(s) charge(s) fixe(s) détectée(s)")}catch(e){}}
 async function loadCF(){try{
- let{data,error}=await SB.from("charges_fixes").select("*").eq("actif",true);if(error)throw error;
- if(!data.length){const r=await SB.from("charges_fixes").insert(SEED);if(r.error)throw r.error;data=(await SB.from("charges_fixes").select("*").eq("actif",true)).data}
+ let{data,error}=await SB.from("charges_fixes").select("*");if(error)throw error;
+ if(!data.length){const r=await SB.from("charges_fixes").insert(SEED.map(c=>({variable:false,...c})));if(r.error)throw r.error}
+ if(!SYN){SYN=true;await syncCF()}
+ data=(await SB.from("charges_fixes").select("*").eq("actif",true)).data;
  CF=data;const{y,m}=FM;
  const a=dstr(new Date(y,m,-6)),b=dstr(new Date(y,m+1,8));
  FT=await all(()=>SB.from("transactions").select("date,libelle,montant").gte("date",a).lt("date",b).order("id"));
