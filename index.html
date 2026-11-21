@@ -55,7 +55,10 @@ li.f{grid-template-columns:44px 1fr auto 36px}
 li.f.late .lb small{color:var(--late);font-weight:600}li.f.ok .lb small{color:var(--ok)}li.f.ok .am{color:var(--mu)}
 .ck{width:32px;height:32px;border-radius:50%;border:2px solid var(--ln);background:transparent;color:transparent;font-size:16px;cursor:pointer;padding:0}
 li.ok .ck{background:var(--ok);border-color:var(--ok);color:var(--on)}li.late .ck{border-color:var(--late)}
-li.sel{background:var(--sf)}.mb{height:6px;border-radius:3px;background:var(--late);margin-top:4px;opacity:.75}
+li.sel{background:var(--sf)}
+.tabs{overflow-x:auto;scrollbar-width:none}.tabs button{flex:0 0 auto;padding:9px 14px;white-space:nowrap}
+table.am2{width:100%;border-collapse:collapse;font-size:13px}table.am2 th,table.am2 td{padding:5px 4px;text-align:right;border-bottom:1px solid var(--ln)}
+table.am2 th:first-child,table.am2 td:first-child{text-align:left}table.am2 tr.cur td{font-weight:700;background:var(--sf)}table.am2 th{color:var(--mu);font-weight:500}.mb{height:6px;border-radius:3px;background:var(--late);margin-top:4px;opacity:.75}
 button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 </style>
 </head>
@@ -68,7 +71,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="go">Se connecter</button><p class="mu" id="lm"></p>
 </section>
 <section id="ap" hidden>
- <div class="tabs"><button id="t1" class="on">Opérations</button><button id="t4">Fixes</button><button id="t5">Analyse</button><button id="t2">Import</button><button id="t3">Quitter</button></div>
+ <div class="tabs"><button id="t1" class="on">Opérations</button><button id="t4">Fixes</button><button id="t5">Analyse</button><button id="t6">Prêts</button><button id="t2">Import</button><button id="t3">Quitter</button></div>
  <div id="v1">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
   <select id="cpf" aria-label="Compte"></select>
@@ -78,7 +81,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <div id="v2" hidden>
   <h2>Importer</h2>
   <p class="mu">Relevé bancaire (.xlsx, 2e onglet), transactions.csv ou regles.csv. Les lignes déjà présentes sont ignorées ; les nouvelles sont catégorisées avec vos règles.</p>
-  <label class="mu" for="cpi">Importer dans le compte :</label><select id="cpi"></select>
+  <label class="mu" for="cpi">Fichier d’un seul compte, importer dans :</label><select id="cpi"></select>
   <label class="btn" for="fi">Choisir un fichier</label><input id="fi" type="file" accept=".xlsx,.csv,.txt" hidden>
   <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button>
   <div id="log"></div>
@@ -94,6 +97,9 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <div class="nav"><button id="yp" aria-label="Année précédente">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Année suivante">›</button></div>
   <p class="mu" id="yt"></p><ul id="ym"></ul>
   <h2 id="yh" style="margin:18px 0 4px;font-size:16px"></h2><ul id="yc"></ul>
+ </div>
+ <div id="v6" hidden>
+  <h2>Prêts</h2><p class="mu">Appuyez sur un prêt pour voir son tableau d’amortissement.</p><ul id="pl"></ul>
  </div>
 </section>
 </main>
@@ -202,7 +208,8 @@ document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset
 $("cpf").onchange=()=>loadView();
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}loadView()};
-function tab(n){[1,2,4,5].forEach(v=>{$("v"+v).hidden=v!==n;$("t"+v).classList.toggle("on",v===n)})}
+function tab(n){[1,2,4,5,6].forEach(v=>{$("v"+v).hidden=v!==n;$("t"+v).classList.toggle("on",v===n)})}
+$("t6").onclick=()=>{tab(6);loadPr()};
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
 $("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);loadAn()};
 const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
@@ -313,8 +320,40 @@ function csv(t){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
 async function ins(rows,onConflict){let n=0;
  for(let i=0;i<rows.length;i+=300){const ch=rows.slice(i,i+300);
   const{error}=await SB.from("transactions").upsert(ch,{onConflict,ignoreDuplicates:true});if(error)throw error;n+=ch.length;log("Envoi… "+n+"/"+rows.length)}}
-async function impBank(buf){
- const wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets[wb.SheetNames[1]];
+let PR=[],EC={},SO={},PS=null;
+const KPc=id=>{const c=CPT.find(x=>x.id===id);return c&&!(c.famille==="Comptes courants"&&c.nom==="Pierre")?c.id+"|":""};
+async function loadPr(){try{
+ PR=(await SB.from("prets").select("*").order("nom")).data||[];
+ const e=await all(()=>SB.from("echeances").select("id,pret_id,date,interets,capital_rembourse,capital_debut,capital_fin").order("id"));
+ EC={};e.forEach(r=>(EC[r.pret_id]=EC[r.pret_id]||[]).push(r));
+ EC&&Object.values(EC).forEach(a=>a.sort((x,y)=>x.date<y.date?-1:1));
+ const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};
+ s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});
+ renderPr()}catch(x){toast("Erreur : "+x.message)}}
+function renderPr(){const t=dstr(now),lim=dstr(new Date(now.getFullYear()-1,now.getMonth(),1));
+ $("pl").innerHTML=PR.map(p=>{const s=EC[p.id]||[],cur=s.filter(r=>r.date<=t).pop(),bk=SO[p.numero];
+  const rest=bk?Math.abs(Number(bk.solde)):cur?Number(cur.capital_fin):null,ini=s.length?Number(s[0].capital_debut||s[0].capital_fin):null;
+  const fin=s.length?s[s.length-1].date:null,it=s.filter(r=>r.date>t).reduce((a,r)=>a+Number(r.interets||0),0);
+  let h=`<li data-p="${p.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${p.nom}</span><small>${fin?"Fin "+fin.slice(0,7)+" · intérêts restants "+eur(it):"Tableau d’amortissement non renseigné"}</small>${ini&&rest!=null?`<div class="bar2"><i style="width:${Math.max(0,Math.min(100,(1-rest/ini)*100))}%"></i></div>`:""}</div><div class="am">${rest!=null?eur(rest):"—"}<br><small class="mu">restant dû${bk?" · "+bk.date.split("-").reverse().join("/"):""}</small></div></li>`;
+  if(PS===p.id&&s.length)h+=`<li style="display:block;cursor:default"><div style="overflow-x:auto"><table class="am2"><tr><th>Échéance</th><th>Intérêts</th><th>Capital</th><th>Restant</th></tr>${s.filter(r=>r.date>=lim).map(r=>`<tr class="${cur&&r.id===cur.id?"cur":""}"><td>${r.date.slice(0,7)}</td><td>${eur(r.interets||0)}</td><td>${eur(r.capital_rembourse||0)}</td><td>${eur(r.capital_fin||0)}</td></tr>`).join("")}</table></div><p class="mu">Affichage : à partir de 12 mois en arrière.</p></li>`;
+  return h}).join("")}
+$("pl").addEventListener("click",ev=>{const li=ev.target.closest("li[data-p]");if(!li)return;PS=PS===li.dataset.p?null:li.dataset.p;renderPr()});
+async function importMulti(wb){await loadPr();
+ const rows=XLSX.utils.sheet_to_json(wb.Sheets["Vos comptes"],{header:1,raw:true,defval:null});
+ const dm=String(rows[0]&&rows[0][0]||"").match(/(\d{2})\/(\d{2})\/(\d{4})/),sd=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:dstr(now);
+ const ok=[],sol=[];let ig=0;
+ for(const r of rows){const n=String(r[1]||"").trim().split(/\s+/).slice(1).join(" ");if(!/^\d{5} \d{11}$/.test(n))continue;
+  const c=CPT.find(x=>x.numero===n),p=PR.find(x=>x.numero===n);
+  if(c||p)sol.push({numero:n,date:sd,solde:Number(r[2])});if(c)ok.push(c);if(!c&&!p)ig++}
+ if(!ok.length){log("Aucun compte reconnu : le script SQL « migration2 » a-t-il été lancé ?");return}
+ if(!confirm(ok.length+" comptes reconnus : "+ok.map(c=>c.nom).join(", ")+".\n"+PR.length+" prêts suivis, "+ig+" comptes ignorés.\nImporter ?")){log("Import annulé.");return}
+ const out=[];
+ for(const c of ok){const ws=wb.Sheets["Cpt "+c.numero];if(!ws)continue;
+  try{log("Import : "+c.nom+"…");out.push(c.nom+" : "+(await impBank(null,wb,ws,c.id)).split("\n")[0])}catch(e){out.push(c.nom+" : "+e.message)}}
+ const{error}=await SB.from("soldes").upsert(sol,{onConflict:"numero,date"});if(error)out.push("Soldes : "+error.message);
+ await loadRef();await counts();await loadPr();log(out.join("\n")+"\n"+ig+" comptes ignorés · soldes du "+sd.split("-").reverse().join("/")+" enregistrés.")}
+async function impBank(buf,wb0,ws0,cid0){
+ const wb=wb0||XLSX.read(buf,{type:"array"}),ws=ws0||wb.Sheets[wb.SheetNames[1]],cid=cid0||CID();
  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
  const hi=rows.findIndex(r=>r[0]==="Date");if(hi<0)throw new Error("Colonne « Date » introuvable (2e onglet attendu)");
  const num=v=>{const n=parseFloat(String(v??"").replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n};
@@ -324,16 +363,16 @@ async function impBank(buf){
   if(!montant||!r[2])continue;L.push({date,libelle:String(r[2]).trim(),montant})}
  if(!L.length)throw new Error("Aucune opération trouvée");
  L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
- const ex=await all(()=>SB.from("transactions").select("id,date,montant").eq("compte_id",CID()).gte("date",L[0].date).lte("date",L[L.length-1].date).order("id"));
+ const ex=await all(()=>SB.from("transactions").select("id,date,montant").eq("compte_id",cid).gte("date",L[0].date).lte("date",L[L.length-1].date).order("id"));
  const have=new Map();for(const e of ex){const k=e.date+"|"+Number(e.montant).toFixed(2);have.set(k,(have.get(k)||0)+1)}
  const seen=new Map(),N=[],cnt={regle:0,suggeree:0,a_completer:0};
  for(const l of L){const k=l.date+"|"+l.montant.toFixed(2),i=seen.get(k)||0;seen.set(k,i+1);
   if(i<(have.get(k)||0))continue;
   const c=classify(l.libelle);cnt[c.statut_cat]++;
-  N.push({...l,...c,compte_id:CID(),cle_doublon:KP()+k.replace("|","|"+l.libelle+"|")+"|b"+i})}
+  N.push({...l,...c,compte_id:cid,cle_doublon:KPc(cid)+k.replace("|","|"+l.libelle+"|")+"|b"+i})}
  if(N.length)await ins(N,"cle_doublon");
- await loadRef();await counts();
- log(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer)}
+ if(!cid0){await loadRef();await counts()}
+ const msg=(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer);if(cid0)return msg;log(msg)}
 async function impCsv(txt){
  const R=csv(txt),h=R[0].map(s=>s.trim()),ix=n=>h.indexOf(n);
  if(ix("cle_doublon")>=0){
@@ -344,9 +383,14 @@ async function impCsv(txt){
   const rows=R.slice(1).filter(r=>r[ix("mot_cle")]&&!have.has(r[ix("mot_cle")].toUpperCase())).map(r=>({mot_cle:r[ix("mot_cle")],categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null}));
   if(rows.length){const{error}=await SB.from("regles").insert(rows);if(error)throw error}
   await loadRef();log(rows.length+" règles ajoutées ("+RULES.length+" au total).")}
+ else if(ix("pret")>=0&&ix("capital_fin")>=0){await loadPr();
+  const rows=R.slice(1).map(r=>{const p=PR.find(x=>x.nom===r[ix("pret")]);return p?{pret_id:p.id,date:r[ix("date")],capital_debut:parseFloat(r[ix("capital_debut")]),interets:parseFloat(r[ix("interets")]),capital_rembourse:parseFloat(r[ix("capital_rembourse")]),capital_fin:parseFloat(r[ix("capital_fin")])}:null}).filter(Boolean);
+  if(!rows.length)throw new Error("Aucun prêt reconnu : le script SQL « migration2 » a-t-il été lancé ?");
+  for(let i=0;i<rows.length;i+=300){const{error}=await SB.from("echeances").upsert(rows.slice(i,i+300),{onConflict:"pret_id,date"});if(error)throw error}
+  await loadPr();log(rows.length+" échéances importées.")}
  else throw new Error("Format CSV non reconnu")}
 $("fi").onchange=async e=>{const f=e.target.files[0];if(!f)return;log("Lecture de "+f.name+"…");
- try{if(/\.xlsx$/i.test(f.name))await impBank(await f.arrayBuffer());else await impCsv(await f.text())}catch(x){log("Erreur : "+x.message)}
+ try{if(/\.xlsx$/i.test(f.name)){const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});if(wb.Sheets["Vos comptes"])await importMulti(wb);else await impBank(null,wb)}else await impCsv(await f.text())}catch(x){log("Erreur : "+x.message)}
  e.target.value=""};
 $("rc").onclick=async()=>{try{await loadRef();const g=new Map();
  for(const r of REF){if(r.statut_cat!=="a_completer"&&r.statut_cat!=="suggeree")continue;const c=classify(r.libelle);
