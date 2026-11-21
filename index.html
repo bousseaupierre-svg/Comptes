@@ -56,6 +56,8 @@ li.f.late .lb small{color:var(--late);font-weight:600}li.f.ok .lb small{color:va
 .ck{width:32px;height:32px;border-radius:50%;border:2px solid var(--ln);background:transparent;color:transparent;font-size:16px;cursor:pointer;padding:0}
 li.ok .ck{background:var(--ok);border-color:var(--ok);color:var(--on)}li.late .ck{border-color:var(--late)}
 li.sel{background:var(--sf)}
+#yt2 td:first-child,#yt2 th:first-child{position:sticky;left:0;background:var(--bg)}#yt2{white-space:nowrap}
+li.gh{display:flex;justify-content:space-between;cursor:default;font-weight:700;border-bottom:0;padding-top:16px}
 .tabs{overflow-x:auto;scrollbar-width:none}.tabs button{flex:0 0 auto;padding:9px 14px;white-space:nowrap}
 table.am2{width:100%;border-collapse:collapse;font-size:13px}table.am2 th,table.am2 td{padding:5px 4px;text-align:right;border-bottom:1px solid var(--ln)}
 table.am2 th:first-child,table.am2 td:first-child{text-align:left}table.am2 tr.cur td{font-weight:700;background:var(--sf)}table.am2 th{color:var(--mu);font-weight:500}.mb{height:6px;border-radius:3px;background:var(--late);margin-top:4px;opacity:.75}
@@ -73,10 +75,12 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 <section id="ap" hidden>
  <div class="tabs"><button id="t1" class="on">Opérations</button><button id="t4">Fixes</button><button id="t5">Analyse</button><button id="t6">Prêts</button><button id="t2">Import</button><button id="t3">Quitter</button></div>
  <div id="v1">
+  <ul id="ca"></ul><div id="park" hidden><div id="txb">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
-  <select id="cpf" aria-label="Compte"></select>
+  <select id="cpf" hidden></select>
   <div class="chips"><button data-f="all" class="on">Mois</button><button data-f="todo" id="c1">À compléter</button><button data-f="sug" id="c2">Suggérées</button></div>
   <p class="mu" id="info"></p><ul id="ls"></ul>
+  </div></div>
  </div>
  <div id="v2" hidden>
   <h2>Importer</h2>
@@ -95,8 +99,9 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  </div>
  <div id="v5" hidden>
   <div class="nav"><button id="yp" aria-label="Année précédente">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Année suivante">›</button></div>
-  <p class="mu" id="yt"></p><ul id="ym"></ul>
-  <h2 id="yh" style="margin:18px 0 4px;font-size:16px"></h2><ul id="yc"></ul>
+  <select id="ymode"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select>
+  <div style="overflow-x:auto"><table class="am2" id="yt2"></table></div>
+  <p class="mu">Comptes courants. Charges en négatif, dépenses en positif, comme dans votre Excel. Solde final : à venir avec le Patrimoine.</p>
  </div>
  <div id="v6" hidden>
   <h2>Prêts</h2><p class="mu">Appuyez sur un prêt pour voir son tableau d’amortissement.</p><ul id="pl"></ul>
@@ -148,7 +153,7 @@ function fillCpt(){
  opt($("cpf"),true);opt($("cpi"),false);
  if(!$("cpi").value&&CPT.length)$("cpi").value=(CPT.find(c=>c.nom==="Pierre")||CPT[0]).id}
 async function loadRef(){SYN=false;
- const cr=await SB.from("comptes").select("*").order("ordre");CPT=cr.data||[];fillCpt();
+ const cr=await SB.from("comptes").select("*").order("ordre");CPT=cr.data||[];fillCpt();await loadSo();renderCa();
  REF=await all(()=>SB.from("transactions").select("id,libelle,categorie,sous_categorie,statut_cat").order("id"));
  RULES=(await all(()=>SB.from("regles").select("*").order("id"))).sort((a,b)=>b.mot_cle.length-a.mot_cle.length);
  const m=new Map();
@@ -296,20 +301,41 @@ $("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(
  if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
 $("fp").onclick=()=>{FM.m--;if(FM.m<0){FM.m=11;FM.y--}loadCF()};
 $("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
-let AY=now.getFullYear(),AM=null,AN=[];
+let AY=now.getFullYear(),AN=[];
+const Z0=()=>({net:0,pv:0,fx:0,bar:0,res:0,vac:0,exc:0,dep:0,loi:0});
+const DEP=["alimentation","course","maison","maison mureaux","santé","vêtement","achat","bébé","enfants","dab","retrait dab"];
 async function loadAn(){try{
- const rows=await all(()=>fc(SB.from("transactions").select("date,montant,categorie")).gte("date",AY+"-01-01").lt("date",(AY+1)+"-01-01").order("id"));
- AN=Array.from({length:12},()=>({i:0,o:0,c:{}}));
- for(const r of rows){const m=+r.date.slice(5,7)-1,v=Number(r.montant),k=r.categorie||"Non classé";if(v>0)AN[m].i+=v;else AN[m].o+=v;AN[m].c[k]=(AN[m].c[k]||0)+v}
+ const cf=(await SB.from("charges_fixes").select("*").eq("actif",true)).data||[];
+ const rows=await all(()=>fc(SB.from("transactions").select("date,montant,categorie,sous_categorie")).gte("date",(AY-1)+"-12-01").lt("date",(AY+1)+"-01-01").order("id"));
+ const md=+$("ymode").value;
+ const bk=d=>{let y=+d.slice(0,4),m=+d.slice(5,7)-1;if(md&&+d.slice(8)>=26){m++;if(m>11){m=0;y++}}return y===AY?m:-1};
+ AN=Array.from({length:12},Z0);
+ for(const r of rows){const m=bk(r.date);if(m<0)continue;const v=Number(r.montant),c=(r.categorie||"").toLowerCase(),s=(r.sous_categorie||"").toLowerCase(),a=AN[m];
+  a.net+=v;
+  if(c==="fixe")a.fx+=v;else if(c.startsWith("exceptionnel"))a.exc-=v;else if(c==="vacances")a.vac-=v;else if(c==="loisir")a.loi-=v;else if(DEP.includes(c))a.dep-=v;
+  if(s==="bar")a.bar-=v;if(s==="restaurant")a.res-=v}
+ AN.forEach((a,m)=>a.pv=occF(AY,m,cf).filter(x=>Number(x.c.montant)<0).reduce((t,x)=>t+Number(x.c.montant),0));
  renderAn()}catch(e){toast("Erreur : "+e.message)}}
-function renderAn(){const S=f=>AN.reduce((s,x)=>s+f(x),0),I=S(x=>x.i),O=S(x=>x.o),mx=Math.max(...AN.map(x=>-x.o),1);
- $("yy").textContent=AY;$("yt").textContent="Revenus "+eur(I)+" · Dépenses "+eur(-O)+" · Balance "+eur(I+O);
- $("ym").innerHTML=AN.map((x,i)=>`<li class="${AM===i?"sel":""}" data-m="${i}"><div class="dy"><b>${MO[i].slice(0,3)}</b></div><div class="lb"><span>Dépenses ${eur(-x.o)}</span><div class="mb" style="width:${-x.o/mx*100}%"></div></div><div class="am ${x.i+x.o>0?"p":""}">${eur(x.i+x.o)}</div></li>`).join("");
- const C={};AN.forEach((x,i)=>{if(AM!==null&&AM!==i)return;for(const k in x.c)C[k]=(C[k]||0)+x.c[k]});
- $("yh").textContent="Par catégorie · "+(AM===null?"toute l’année":MO[AM]);
- $("yc").innerHTML=Object.entries(C).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([k,v])=>`<li style="grid-template-columns:1fr auto"><div class="lb"><span>${k}</span></div><div class="am ${v>0?"p":""}">${eur(v)}</div></li>`).join("")}
-$("ym").addEventListener("click",ev=>{const li=ev.target.closest("li");if(!li)return;const i=+li.dataset.m;AM=AM===i?null:i;renderAn()});
-$("yp").onclick=()=>{AY--;AM=null;loadAn()};$("yn").onclick=()=>{AY++;AM=null;loadAn()};
+function renderAn(){const f=n=>Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const K=["net","pv","fx","df","bar","res","vac","exc","dep","loi"],H=["Mois","Balance","Fixe prévu","Fixe payé","Différence","Bar","Restaurant","Vacances","Exceptionnelle","Dépense","Loisir"];
+ AN.forEach(a=>a.df=a.fx-a.pv);
+ const T=Z0();T.df=0;AN.forEach(a=>K.forEach(k=>T[k]+=a[k]));
+ const row=(l,a,em)=>"<tr><td>"+l+"</td>"+K.map(k=>"<td>"+(em?"":f(a[k]))+"</td>").join("")+"</tr>";
+ $("yy").textContent=AY;
+ $("yt2").innerHTML="<tr>"+H.map(x=>"<th>"+x+"</th>").join("")+"</tr>"+AN.map((a,m)=>row(MO[m].slice(0,4)+".",a,AY>now.getFullYear()||(AY===now.getFullYear()&&m>now.getMonth()))).join("")+row("Total",T,false).replace("<tr>",'<tr class="cur">')}
+$("yp").onclick=()=>{AY--;loadAn()};$("yn").onclick=()=>{AY++;loadAn()};$("ymode").onchange=()=>loadAn();
+let SELC=null;
+async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r})}catch(e){}}
+function renderCa(){$("park").appendChild($("txb"));
+ const bal=c=>c.numero&&SO[c.numero]?Number(SO[c.numero].solde):null,fd=d=>d.split("-").reverse().join("/");
+ let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
+ for(const f of [...new Set(CPT.map(c=>c.famille))]){const cs=CPT.filter(c=>c.famille===f),tot=cs.reduce((t,c)=>t+(bal(c)||0),0);
+  h+=`<li class="gh"><span>${f}</span><span>${eur(tot)}</span></li>`;
+  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?"solde au "+fd(SO[c.numero].date):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
+ $("ca").innerHTML=h;
+ if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";w.appendChild($("txb"));li.after(w)}}}
+$("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;SELC=SELC===id?null:id;
+ $("cpf").value=SELC===null||SELC==="*"?"":SELC;renderCa();if(SELC!==null)loadView()});
 $("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
 function csv(t){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
  for(let i=0;i<t.length;i++){const ch=t[i];
