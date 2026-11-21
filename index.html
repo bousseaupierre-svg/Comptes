@@ -86,7 +86,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <div class="big" id="fr"></div><div class="mu">à payer d’ici la fin du mois</div>
   <div class="bar2"><i id="fg"></i></div><div class="mu" id="fs"></div>
   <ul id="fl"></ul>
-  <p class="mu">Les charges sont pointées automatiquement d’après vos opérations. Appuyez sur le rond pour pointer ou annuler une charge manuellement.</p>
+  <p class="mu">Les charges sont pointées automatiquement d’après vos opérations. Rond : pointer ou annuler à la main. Ligne : modifier le montant ou retirer la charge.</p>
  </div>
  <div id="v5" hidden>
   <div class="nav"><button id="yp" aria-label="Année précédente">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Année suivante">›</button></div>
@@ -103,7 +103,17 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <div class="row"><input type="checkbox" id="sim"><label for="sim" style="color:inherit">Appliquer aux lignes similaires (<span id="sn">0</span>)</label></div>
  <div class="row"><input type="checkbox" id="ru"><label for="ru" style="color:inherit">Créer une règle pour le mot-clé :</label></div>
  <input id="rk">
+ <div class="row"><input type="checkbox" id="fx1"><label for="fx1" style="color:inherit">Ajouter aux charges fixes (mot-clé ci-dessus)</label></div>
+ <select id="fq"><option value="m">Tous les mois</option><option value="t">Tous les 3 mois</option><option value="a">Une fois par an</option><option value="w">Chaque semaine</option></select>
  <button class="btn" id="ssv">Enregistrer</button><button class="btn alt" id="sx">Fermer</button>
+</dialog>
+<dialog id="fxd">
+ <h2 id="fxt" style="font-size:16px"></h2><p class="mu">Après modification, ce montant et ce jour ne sont plus mis à jour automatiquement.</p>
+ <label>Montant (€)<input id="fxa" type="number" step="0.01" inputmode="decimal"></label>
+ <label id="fxl">Jour du mois<input id="fxj" type="number" min="1" max="31" inputmode="numeric"></label>
+ <button class="btn" id="fxv">Enregistrer</button>
+ <button class="btn alt" id="fxr" style="color:var(--late);border-color:var(--late)">Retirer des charges fixes</button>
+ <button class="btn alt" id="fxc">Fermer</button>
 </dialog>
 <div id="toast" role="status"></div>
 <script>
@@ -159,7 +169,7 @@ $("ls").addEventListener("click",async ev=>{
  $("sl").textContent=cur.libelle;$("sa").textContent=cur.date+" · "+eur(cur.montant);
  $("sc").value=cur.categorie||"";$("su").value=cur.sous_categorie||"";subs();
  const k=norm(cur.libelle),n=REF.filter(r=>r.id!==cur.id&&r.statut_cat!=="manuelle"&&norm(r.libelle)===k).length;
- $("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
+ $("fx1").checked=false;$("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
 function subs(){const c=$("sc").value.trim();$("ds").innerHTML=[...new Set(REF.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))].sort().map(s=>`<option value="${s.replace(/"/g,"&quot;")}">`).join("")}
 $("sc").addEventListener("input",subs);
 $("sx").onclick=()=>$("sh").close();
@@ -169,6 +179,9 @@ $("ssv").onclick=async()=>{const c=$("sc").value.trim(),s=$("su").value.trim();i
   await upd(ids,{categorie:c,sous_categorie:s||null,statut_cat:"manuelle"});
   const kw=$("rk").value.trim();
   if($("ru").checked&&kw){const{error}=await SB.from("regles").insert({mot_cle:kw,categorie:c,sous_categorie:s||null});if(error)throw error}
+  if($("fx1").checked){if(!kw||!cur.libelle.toUpperCase().includes(kw.toUpperCase()))throw new Error("le mot-clé doit apparaître dans le libellé");
+   const f=$("fq").value,d=new Date(cur.date+"T12:00:00"),mm=d.getMonth()+1,q=f==="t"?[0,3,6,9].map(i=>(mm-1+i)%12+1).sort((a,b)=>a-b):f==="a"?[mm]:null;
+   const r=await SB.from("charges_fixes").insert({id:"man-"+Date.now().toString(36),libelle:s||kw[0].toUpperCase()+kw.slice(1).toLowerCase(),montant:Number(cur.montant),jour:f==="w"?null:d.getDate(),jour_semaine:f==="w"?d.getDay():null,mois:q,mots_cles:[kw],variable:false,actif:true});if(r.error)throw r.error}
   $("sh").close();toast(ids.length+" ligne(s) mise(s) à jour");await loadRef();loadView()}catch(e){toast("Erreur : "+e.message)}};
 document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset.f;document.querySelectorAll(".chips button").forEach(x=>x.classList.toggle("on",x===b));loadView()});
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}loadView()};
@@ -245,7 +258,16 @@ function renderCF(){const t=new Date();t.setHours(0,0,0,0);let due=0,paid=0,rest
  $("fl").innerHTML=h;$("fm").textContent=MO[FM.m][0].toUpperCase()+MO[FM.m].slice(1)+" "+FM.y;
  $("fr").textContent=eur(rest);$("fg").style.width=(due?Math.min(100,paid/due*100):0)+"%";
  $("fs").textContent="Payé "+eur(paid)+" sur "+eur(due)+" · Revenus "+eur(got)+" sur "+eur(inc)}
+let FX=null;
+$("fx1").onchange=()=>{if($("fx1").checked){$("sc").value="Fixe";subs()}};
+$("fxc").onclick=()=>$("fxd").close();
+$("fxv").onclick=async()=>{const u={auto:false,montant:parseFloat($("fxa").value)};if(isNaN(u.montant)){toast("Montant invalide");return}
+ if(!$("fxl").hidden&&$("fxj").value)u.jour=Math.min(31,Math.max(1,parseInt($("fxj").value)));
+ const r=await SB.from("charges_fixes").update(u).eq("id",FX.id);if(r.error){toast("Erreur : "+r.error.message);return}$("fxd").close();loadCF()};
+$("fxr").onclick=async()=>{const r=await SB.from("charges_fixes").update({ignore:true,actif:false}).eq("id",FX.id);
+ if(r.error){toast("Erreur : "+r.error.message+" (avez-vous lancé le script SQL de mise à jour ?)");return}$("fxd").close();toast("Charge retirée");loadCF()};
 $("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(!li)return;const x=FO.find(z=>z.k===li.dataset.k);
+ if(!ev.target.closest(".ck")){FX=x.c;$("fxt").textContent=x.c.libelle;$("fxa").value=x.c.montant;$("fxj").value=x.c.jour??"";$("fxl").hidden=x.c.jour_semaine!=null;$("fxd").showModal();return}
  if(x.p&&x.p.auto){toast("Pointée automatiquement d’après le relevé");return}
  const r=x.p?await SB.from("pointages").delete().eq("cle",x.k):await SB.from("pointages").insert({cle:x.k,montant:x.c.montant,date:dstr(x.dt)});
  if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
