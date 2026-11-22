@@ -84,9 +84,9 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  </div>
  <div id="v2" hidden>
   <h2>Importer</h2>
-  <p class="mu">Relevé bancaire (.xlsx, 2e onglet), transactions.csv ou regles.csv. Les lignes déjà présentes sont ignorées ; les nouvelles sont catégorisées avec vos règles.</p>
-  <label class="mu" for="cpi">Fichier d’un seul compte, importer dans :</label><select id="cpi"></select>
-  <label class="btn" for="fi">Choisir un fichier</label><input id="fi" type="file" accept=".xlsx,.csv,.txt" hidden>
+  <p class="mu">Déposez vos fichiers (plusieurs à la fois) : le compte est reconnu automatiquement. Les lignes déjà présentes sont ignorées ; les nouvelles sont catégorisées avec vos règles.</p>
+  <select id="cpi" hidden></select>
+  <label class="btn" for="fi">Choisir des fichiers</label><input id="fi" type="file" accept=".xlsx,.csv,.txt,.pdf" multiple hidden>
   <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button>
   <div id="log"></div>
  </div>
@@ -327,20 +327,20 @@ $("yp").onclick=()=>{AY--;loadAn()};$("yn").onclick=()=>{AY++;loadAn()};$("ymode
 let SELC=null;
 async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r})}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));
- const bal=c=>c.numero&&SO[c.numero]?Number(SO[c.numero].solde):null,fd=d=>d.split("-").reverse().join("/");
+ const bal=c=>SO[ck(c)]?Number(SO[ck(c)].solde):null,fd=d=>d.split("-").reverse().join("/");
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
  for(const f of [...new Set(CPT.map(c=>c.famille))]){const cs=CPT.filter(c=>c.famille===f),tot=cs.reduce((t,c)=>t+(bal(c)||0),0);
   h+=`<li class="gh"><span>${f}</span><span>${eur(tot)}</span></li>`;
-  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?"solde au "+fd(SO[c.numero].date):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
+  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?"solde au "+fd(SO[ck(c)].date):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
  $("ca").innerHTML=h;
  if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";w.appendChild($("txb"));li.after(w)}}}
 $("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;SELC=SELC===id?null:id;
  $("cpf").value=SELC===null||SELC==="*"?"":SELC;renderCa();if(SELC!==null)loadView()});
 $("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
-function csv(t){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
+function csv(t,sp=","){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
  for(let i=0;i<t.length;i++){const ch=t[i];
   if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
-  else if(ch==='"')q=true;else if(ch===","){r.push(c);c=""}
+  else if(ch==='"')q=true;else if(ch===sp){r.push(c);c=""}
   else if(ch==="\n"){r.push(c.replace(/\r$/,""));R.push(r);r=[];c=""}else c+=ch}
  if(c||r.length){r.push(c);R.push(r)}return R.filter(x=>x.length>1)}
 async function ins(rows,onConflict){let n=0;
@@ -367,17 +367,19 @@ $("pl").addEventListener("click",ev=>{const li=ev.target.closest("li[data-p]");i
 async function importMulti(wb){await loadPr();
  const rows=XLSX.utils.sheet_to_json(wb.Sheets["Vos comptes"],{header:1,raw:true,defval:null});
  const dm=String(rows[0]&&rows[0][0]||"").match(/(\d{2})\/(\d{2})\/(\d{4})/),sd=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:dstr(now);
- const ok=[],sol=[];let ig=0;
- for(const r of rows){const n=String(r[1]||"").trim().split(/\s+/).slice(1).join(" ");if(!/^\d{5} \d{11}$/.test(n))continue;
+ const ok=[],sol=[];let ig=0,valo=null;
+ for(const r of rows){if(/^Valorisation totale/i.test(String(r[0]||""))){valo=Number(r[2]);continue}
+  const n=String(r[1]||"").trim().split(/\s+/).slice(1).join(" ");if(!/^\d{5} \d{11}$/.test(n))continue;
   const c=CPT.find(x=>x.numero===n),p=PR.find(x=>x.numero===n);
   if(c||p)sol.push({numero:n,date:sd,solde:Number(r[2])});if(c)ok.push(c);if(!c&&!p)ig++}
- if(!ok.length){log("Aucun compte reconnu : le script SQL « migration2 » a-t-il été lancé ?");return}
- if(!confirm(ok.length+" comptes reconnus : "+ok.map(c=>c.nom).join(", ")+".\n"+PR.length+" prêts suivis, "+ig+" comptes ignorés.\nImporter ?")){log("Import annulé.");return}
+ const lq=ok.find(c=>c.produit==="Compte liquidité PEA"),pea=lq&&CPT.find(c=>c.produit==="PEA"&&c.titulaire===lq.titulaire);if(valo!==null&&pea)sol.push({numero:ck(pea),date:sd,solde:valo});
+ if(!ok.length)return "Aucun compte reconnu : le script SQL « migration2 » a-t-il été lancé ?"
+ if(!confirm(ok.length+" comptes reconnus : "+ok.map(c=>c.nom).join(", ")+".\n"+PR.length+" prêts suivis, "+ig+" comptes ignorés.\nImporter ?")) return "Import annulé."
  const out=[];
  for(const c of ok){const ws=wb.Sheets["Cpt "+c.numero];if(!ws)continue;
   try{log("Import : "+c.nom+"…");out.push(c.nom+" : "+(await impBank(null,wb,ws,c.id)).split("\n")[0])}catch(e){out.push(c.nom+" : "+e.message)}}
  const{error}=await SB.from("soldes").upsert(sol,{onConflict:"numero,date"});if(error)out.push("Soldes : "+error.message);
- await loadRef();await counts();await loadPr();log(out.join("\n")+"\n"+ig+" comptes ignorés · soldes du "+sd.split("-").reverse().join("/")+" enregistrés.")}
+ await loadRef();await counts();await loadPr();return(out.join("\n")+"\n"+ig+" comptes ignorés · soldes du "+sd.split("-").reverse().join("/")+" enregistrés.")}
 async function impBank(buf,wb0,ws0,cid0){
  const wb=wb0||XLSX.read(buf,{type:"array"}),ws=ws0||wb.Sheets[wb.SheetNames[1]],cid=cid0||CID();
  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
@@ -399,25 +401,100 @@ async function impBank(buf,wb0,ws0,cid0){
  if(N.length)await ins(N,"cle_doublon");
  if(!cid0){await loadRef();await counts()}
  const msg=(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer);if(cid0)return msg;log(msg)}
-async function impCsv(txt){
- const R=csv(txt),h=R[0].map(s=>s.trim()),ix=n=>h.indexOf(n);
- if(ix("cle_doublon")>=0){
-  const rows=R.slice(1).map(r=>({date:r[ix("date")],libelle:r[ix("libelle")],montant:parseFloat(r[ix("montant")]),categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null,statut_cat:r[ix("statut_cat")]||"a_completer",compte_id:CID(),cle_doublon:KP()+r[ix("cle_doublon")]})).filter(r=>r.date&&!isNaN(r.montant));
-  await ins(rows,"cle_doublon");await loadRef();await counts();log(rows.length+" lignes traitées (les doublons sont ignorés).")}
- else if(ix("mot_cle")>=0){
-  const have=new Set(RULES.map(r=>r.mot_cle.toUpperCase()));
+const num2=v=>{const n=parseFloat(String(v==null?"":v).replace(/[\s\u00a0\u202f]/g,"").replace(",","."));return isNaN(n)?0:n};
+const byNum=n=>CPT.find(c=>c.numero===n),byNom=n=>CPT.find(c=>c.nom===n),ck=c=>c.numero||"cpt:"+c.id;
+async function putSolde(c,date,solde){const{error}=await SB.from("soldes").upsert({numero:ck(c),date,solde},{onConflict:"numero,date"});if(error)throw error}
+async function pushLines(cid,L){
+ if(!L.length)return "aucune opération";
+ L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+ const ex=await all(()=>SB.from("transactions").select("id,date,montant").eq("compte_id",cid).gte("date",L[0].date).lte("date",L[L.length-1].date).order("id"));
+ const have=new Map();for(const e of ex){const k=e.date+"|"+Number(e.montant).toFixed(2);have.set(k,(have.get(k)||0)+1)}
+ const seen=new Map(),N=[];
+ for(const l of L){const k=l.date+"|"+l.montant.toFixed(2),i=seen.get(k)||0;seen.set(k,i+1);if(i<(have.get(k)||0))continue;
+  N.push({date:l.date,libelle:l.libelle,montant:l.montant,note:l.note||null,...classify(l.libelle),compte_id:cid,cle_doublon:KPc(cid)+k.replace("|","|"+l.libelle+"|")+"|b"+i})}
+ if(N.length)await ins(N,"cle_doublon");
+ return L.length+" lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées"}
+async function impBourso(R,h){
+ const ix=n=>h.indexOf(n),iS=h.indexOf("Solde"),iS2=h.lastIndexOf("Solde");
+ const c=byNum(String((R[1]||[])[ix("Numéro Compte")]||"").trim())||byNom("Boursorama");
+ if(!c)throw new Error("compte Boursorama introuvable (script migration3 lancé ?)");
+ const L=[];let last=null;
+ for(const r of R.slice(1)){const d=r[ix("Date Valeur")];if(!/^\d{4}-\d{2}-\d{2}$/.test(d||""))continue;
+  const m=Math.round(num2(r[iS])*100)/100;if(!m)continue;
+  L.push({date:d,libelle:String(r[ix("Libellé")]||"").trim(),montant:m,note:"Boursorama : "+(r[ix("Catégorie")]||"")});
+  if(!last||d>last.d)last={d,s:num2(r[iS2])}}
+ const msg=await pushLines(c.id,L);if(last)await putSolde(c,last.d,last.s);
+ return c.nom+" : "+msg}
+async function impPortef(R,name){
+ const m=name.match(/(\d{5,})/);let c=m&&byNum(m[1]);
+ if(!c){const av=CPT.filter(x=>x.produit==="Assurance vie");
+  if(av.length===1)c=av[0];else{const a=prompt("Quel contrat d’assurance vie ?\n"+av.map((x,i)=>(i+1)+" = "+x.nom).join("\n"));c=av[(+a||0)-1]}}
+ if(!c)throw new Error("contrat d’assurance vie non reconnu");
+ const d=dstr(now),P=[];let tot=0;
+ for(const r of R.slice(1)){if(!r[0]||!r[1])continue;const v=num2(r[3]);tot+=v;
+  P.push({compte_id:c.id,date:d,libelle:r[0].trim(),isin:r[1].trim(),poids:num2(r[2]),valeur:v,quantite:num2(r[4]),prix_unitaire:num2(r[5]),prix_revient:num2(r[6]),plus_value_pct:num2(r[7]),plus_value:num2(r[8])})}
+ const{error}=await SB.from("positions").upsert(P,{onConflict:"compte_id,date,libelle"});if(error)throw error;
+ await putSolde(c,d,Math.round(tot*100)/100);
+ return c.nom+" : "+P.length+" supports, total "+eur(tot)}
+async function impSoldes(R,h){const rows=[];let skip=0;
+ for(const r of R.slice(1)){const c=byNom(r[h.indexOf("compte")]);if(!c){skip++;continue}rows.push({numero:ck(c),date:r[h.indexOf("date")],solde:num2(r[h.indexOf("solde")])})}
+ for(let i=0;i<rows.length;i+=300){const{error}=await SB.from("soldes").upsert(rows.slice(i,i+300),{onConflict:"numero,date"});if(error)throw error}
+ return rows.length+" soldes importés"+(skip?" ("+skip+" ignorés : compte inconnu)":"")}
+async function impTxCsv(R,h){const ix=n=>h.indexOf(n),by={};let skip=0;
+ for(const r of R.slice(1)){const c=byNom(r[ix("compte")]);if(!c){skip++;continue}const m=parseFloat(r[ix("montant")]);if(!r[ix("date")]||isNaN(m))continue;
+  (by[c.id]=by[c.id]||[]).push({date:r[ix("date")],libelle:r[ix("libelle")],montant:m,categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null,statut_cat:r[ix("statut_cat")]||"a_completer",compte_id:c.id,cle_doublon:KPc(c.id)+r[ix("cle_doublon")]})}
+ let n=0;for(const id in by){await ins(by[id],"cle_doublon");n+=by[id].length}
+ return n+" lignes traitées (doublons ignorés)"+(skip?" · "+skip+" ignorées : compte inconnu":"")}
+async function importCsv(txt,name){
+ const first=txt.replace(/^\ufeff/,"").split(/\r?\n/)[0],sep=first.split(";").length>first.split(",").length?";":",";
+ const R=csv(txt,sep),h=R[0].map(s=>s.trim());
+ if(h.includes("Date Opération")&&h.includes("Numéro Compte"))return impBourso(R,h);
+ if(h.includes("Libellé Support")&&h.includes("ISIN"))return impPortef(R,name);
+ if(h.includes("cle_doublon")&&h.includes("compte"))return impTxCsv(R,h);
+ if(h.includes("compte")&&h.includes("solde")&&h.includes("date"))return impSoldes(R,h);
+ const ix=n=>h.indexOf(n);
+ if(ix("mot_cle")>=0){const have=new Set(RULES.map(r=>r.mot_cle.toUpperCase()));
   const rows=R.slice(1).filter(r=>r[ix("mot_cle")]&&!have.has(r[ix("mot_cle")].toUpperCase())).map(r=>({mot_cle:r[ix("mot_cle")],categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null}));
   if(rows.length){const{error}=await SB.from("regles").insert(rows);if(error)throw error}
-  await loadRef();log(rows.length+" règles ajoutées ("+RULES.length+" au total).")}
- else if(ix("pret")>=0&&ix("capital_fin")>=0){await loadPr();
+  return rows.length+" règles ajoutées"}
+ if(ix("pret")>=0&&ix("capital_fin")>=0){await loadPr();
   const rows=R.slice(1).map(r=>{const p=PR.find(x=>x.nom===r[ix("pret")]);return p?{pret_id:p.id,date:r[ix("date")],capital_debut:parseFloat(r[ix("capital_debut")]),interets:parseFloat(r[ix("interets")]),capital_rembourse:parseFloat(r[ix("capital_rembourse")]),capital_fin:parseFloat(r[ix("capital_fin")])}:null}).filter(Boolean);
-  if(!rows.length)throw new Error("Aucun prêt reconnu : le script SQL « migration2 » a-t-il été lancé ?");
+  if(!rows.length)throw new Error("aucun prêt reconnu (script migration2 lancé ?)");
   for(let i=0;i<rows.length;i+=300){const{error}=await SB.from("echeances").upsert(rows.slice(i,i+300),{onConflict:"pret_id,date"});if(error)throw error}
-  await loadPr();log(rows.length+" échéances importées.")}
- else throw new Error("Format CSV non reconnu")}
-$("fi").onchange=async e=>{const f=e.target.files[0];if(!f)return;log("Lecture de "+f.name+"…");
- try{if(/\.xlsx$/i.test(f.name)){const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});if(wb.Sheets["Vos comptes"])await importMulti(wb);else await impBank(null,wb)}else await impCsv(await f.text())}catch(x){log("Erreur : "+x.message)}
- e.target.value=""};
+  await loadPr();return rows.length+" échéances importées"}
+ throw new Error("format de fichier non reconnu")}
+const MOIS={"janv.":1,"févr.":2,"mars":3,"avr.":4,"mai":5,"juin":6,"juil.":7,"août":8,"sept.":9,"oct.":10,"nov.":11,"déc.":12};
+async function loadPdfJs(){if(window.pdfjsLib)return;
+ await new Promise((ok,ko)=>{const e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";e.onload=ok;e.onerror=()=>ko(new Error("lecteur PDF indisponible"));document.head.appendChild(e)});
+ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"}
+async function impPdf(f){await loadPdfJs();
+ const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let txt="";const L=[];let last=null;
+ for(let p=1;p<=doc.numPages;p++){const pg=await doc.getPage(p),H=pg.getViewport({scale:1}).height,tc=await pg.getTextContent();
+  const it=tc.items.filter(i=>i.str.trim()).map(i=>({s:i.str.trim(),x:i.transform[4],y:H-i.transform[5]}));
+  txt+=it.map(i=>i.s).join(" ")+" ";
+  const hd=it.find(i=>i.s==="DATE"&&i.x<80);if(!hd)continue;
+  const ap=it.find(i=>/^APERÇU/.test(i.s)),y1=ap?ap.y-6:745;
+  const T=it.filter(i=>i.y>hd.y+8&&i.y<y1).sort((a,b)=>a.y-b.y||a.x-b.x);
+  const st=T.filter(i=>i.x<80&&/^\d{1,2}(\s|$)/.test(i.s));
+  st.forEach((s,k)=>{const R=T.filter(i=>i.y>=s.y-4&&i.y<(st[k+1]?st[k+1].y-4:y1));
+   const m=R.filter(i=>i.x<100).map(i=>i.s).join(" ").match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);if(!m||!MOIS[m[2]])return;
+   const date=m[3]+"-"+String(MOIS[m[2]]).padStart(2,"0")+"-"+m[1].padStart(2,"0");
+   const ty=R.filter(i=>i.x>=100&&i.x<140).map(i=>i.s).join(" "),ds=R.filter(i=>i.x>=140&&i.x<420).map(i=>i.s).join(" ");
+   const am=R.filter(i=>i.x>=420&&/^\d[\d\s]*,\d{2}\s*€?$/.test(i.s)).sort((a,b)=>a.x-b.x);if(!am.length)return;
+   const v=a=>num2(a.s.replace(/€/,""));const montant=am.length>1?(am[0].x<443?1:-1)*v(am[0]):0;if(!montant)return;
+   L.push({date,libelle:ds?ty+" | "+ds:ty,montant});last={date,solde:v(am[am.length-1])}})}
+ if(!/TRADE REPUBLIC/i.test(txt))throw new Error("PDF non reconnu (relevé Trade Republic attendu)");
+ const c=CPT.find(x=>x.produit==="Trade Republic");if(!c)throw new Error("compte Trade Republic introuvable");
+ const msg=await pushLines(c.id,L);if(last)await putSolde(c,last.date,last.solde);return c.nom+" : "+msg}
+async function importFile(f){const n=f.name;
+ if(/\.xlsx$/i.test(n)){const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});if(wb.Sheets["Vos comptes"])return await importMulti(wb);throw new Error("fichier Excel non reconnu (onglet « Vos comptes » attendu)")}
+ if(/\.pdf$/i.test(n))return impPdf(f);
+ const b=await f.arrayBuffer();let t=new TextDecoder("utf-8").decode(b);if(t.includes("\ufffd"))t=new TextDecoder("windows-1252").decode(b);
+ return importCsv(t,n)}
+$("fi").onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const out=[];
+ for(const f of fs){log("Lecture de "+f.name+"…");try{out.push("• "+f.name+" : "+await importFile(f))}catch(x){out.push("• "+f.name+" : erreur, "+x.message)}}
+ try{await loadRef();await counts()}catch(x){}
+ log(out.join("\n"));e.target.value=""};
 $("rc").onclick=async()=>{try{await loadRef();const g=new Map();
  for(const r of REF){if(r.statut_cat!=="a_completer"&&r.statut_cat!=="suggeree")continue;const c=classify(r.libelle);
   if(c.statut_cat==="a_completer")continue;const k=[c.categorie,c.sous_categorie||"",c.statut_cat].join("\u0001");if(!g.has(k))g.set(k,[]);g.get(k).push(r.id)}
