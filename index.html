@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Comptes">
 <title>Comptes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0f4c5c">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -57,6 +60,7 @@ li.f.late .lb small{color:var(--late);font-weight:600}li.f.ok .lb small{color:va
 li.ok .ck{background:var(--ok);border-color:var(--ok);color:var(--on)}li.late .ck{border-color:var(--late)}
 li.sel{background:var(--sf)}
 #yt2 td:first-child,#yt2 th:first-child{position:sticky;left:0;background:var(--bg)}#yt2{white-space:nowrap}
+.card{background:var(--sf);border-radius:12px;padding:12px 14px;margin:12px 0;cursor:pointer}.card h3{margin:0 0 6px;font-size:16px}
 li.gh{display:flex;justify-content:space-between;cursor:default;font-weight:700;border-bottom:0;padding-top:16px}
 .tabs{overflow-x:auto;scrollbar-width:none}.tabs button{flex:0 0 auto;padding:9px 14px;white-space:nowrap}
 table.am2{width:100%;border-collapse:collapse;font-size:13px}table.am2 th,table.am2 td{padding:5px 4px;text-align:right;border-bottom:1px solid var(--ln)}
@@ -87,8 +91,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <p class="mu">Déposez vos fichiers (plusieurs à la fois) : le compte est reconnu automatiquement. Les lignes déjà présentes sont ignorées ; les nouvelles sont catégorisées avec vos règles.</p>
   <select id="cpi" hidden></select>
   <label class="btn" for="fi">Choisir des fichiers</label><input id="fi" type="file" accept=".xlsx,.csv,.txt,.pdf" multiple hidden>
-  <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button>
-  <div id="log"></div><p class="mu" id="ver">Version du 22/11 · import automatique des comptes</p>
+  <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button><button class="btn alt" id="rk2">Actualiser les cours des cryptos</button>
+  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (b) · analyse, cryptos, cours en direct</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -98,10 +102,9 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <p class="mu">Les charges sont pointées automatiquement d’après vos opérations. Rond : pointer ou annuler à la main. Ligne : modifier le montant ou retirer la charge.</p>
  </div>
  <div id="v5" hidden>
-  <div class="nav"><button id="yp" aria-label="Année précédente">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Année suivante">›</button></div>
-  <select id="ymode"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select>
-  <div style="overflow-x:auto"><table class="am2" id="yt2"></table></div>
-  <p class="mu">Comptes courants. Charges en négatif, dépenses en positif, comme dans votre Excel. Solde final : à venir avec le Patrimoine.</p>
+  <div class="nav"><button id="yp" aria-label="Mois précédent">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Mois suivant">›</button></div>
+  <div id="ya"></div>
+  <p class="mu">Soldes de fin de mois, débits et crédits par type de compte, comme l’onglet « Compte » de votre Excel.</p>
  </div>
  <div id="v6" hidden>
   <h2>Prêts</h2><p class="mu">Appuyez sur un prêt pour voir son tableau d’amortissement.</p><ul id="pl"></ul>
@@ -301,31 +304,43 @@ $("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(
  if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
 $("fp").onclick=()=>{FM.m--;if(FM.m<0){FM.m=11;FM.y--}loadCF()};
 $("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
-let AY=now.getFullYear(),AN=[];
-const Z0=()=>({net:0,pv:0,fx:0,bar:0,res:0,vac:0,exc:0,dep:0,loi:0});
-const DEP=["alimentation","course","maison","maison mureaux","santé","vêtement","achat","bébé","enfants","dab","retrait dab"];
+let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={};
+const ymEnd=(y,m)=>ymd(y,m,new Date(y,m+1,0).getDate());
 async function loadAn(){try{
- const cf=(await SB.from("charges_fixes").select("*").eq("actif",true)).data||[];
- const rows=await all(()=>fc(SB.from("transactions").select("date,montant,categorie,sous_categorie")).gte("date",(AY-1)+"-12-01").lt("date",(AY+1)+"-01-01").order("id"));
- const md=+$("ymode").value;
- const bk=d=>{let y=+d.slice(0,4),m=+d.slice(5,7)-1;if(md&&+d.slice(8)>=26){m++;if(m>11){m=0;y++}}return y===AY?m:-1};
- AN=Array.from({length:12},Z0);
- for(const r of rows){const m=bk(r.date);if(m<0)continue;const v=Number(r.montant),c=(r.categorie||"").toLowerCase(),s=(r.sous_categorie||"").toLowerCase(),a=AN[m];
-  a.net+=v;
-  if(c==="fixe")a.fx+=v;else if(c.startsWith("exceptionnel"))a.exc-=v;else if(c==="vacances")a.vac-=v;else if(c==="loisir")a.loi-=v;else if(DEP.includes(c))a.dep-=v;
-  if(s==="bar")a.bar-=v;if(s==="restaurant")a.res-=v}
- AN.forEach((a,m)=>a.pv=occF(AY,m,cf).filter(x=>Number(x.c.montant)<0).reduce((t,x)=>t+Number(x.c.montant),0));
- renderAn()}catch(e){toast("Erreur : "+e.message)}}
-function renderAn(){const f=n=>Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
- const K=["net","pv","fx","df","bar","res","vac","exc","dep","loi"],H=["Mois","Balance","Fixe prévu","Fixe payé","Différence","Bar","Restaurant","Vacances","Exceptionnelle","Dépense","Loisir"];
- AN.forEach(a=>a.df=a.fx-a.pv);
- const T=Z0();T.df=0;AN.forEach(a=>K.forEach(k=>T[k]+=a[k]));
- const row=(l,a,em)=>"<tr><td>"+l+"</td>"+K.map(k=>"<td>"+(em?"":f(a[k]))+"</td>").join("")+"</tr>";
- $("yy").textContent=AY;
- $("yt2").innerHTML="<tr>"+H.map(x=>"<th>"+x+"</th>").join("")+"</tr>"+AN.map((a,m)=>row(MO[m].slice(0,4)+".",a,AY>now.getFullYear()||(AY===now.getFullYear()&&m>now.getMonth()))).join("")+row("Total",T,false).replace("<tr>",'<tr class="cur">')}
-$("yp").onclick=()=>{AY--;loadAn()};$("yn").onclick=()=>{AY++;loadAn()};$("ymode").onchange=()=>loadAn();
+ const ASO=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));
+ const s=ymd(AY,AMo,1),e=ymd(AMo===11?AY+1:AY,(AMo+1)%12,1);
+ const tx=await all(()=>SB.from("transactions").select("compte_id,montant").gte("date",s).lt("date",e).order("id"));
+ const ec=await all(()=>SB.from("echeances").select("id,pret_id,capital_debut,interets,capital_rembourse,capital_fin").gte("date",s).lt("date",e).order("id"));
+ if(!PR.length)PR=(await SB.from("prets").select("*").order("nom")).data||[];
+ AX={ASO,tx,ec};renderAn()}catch(x){toast("Erreur : "+x.message)}}
+function renderAn(){
+ const{ASO,tx,ec}=AX,d0=ymEnd(AMo===0?AY-1:AY,(AMo+11)%12),d1=ymEnd(AY,AMo);
+ const bal=(k,d)=>{let b=null;for(const r of ASO)if(r.numero===k&&r.date<=d&&(!b||r.date>b.date))b=r;return b?Number(b.solde):null};
+ const fl={};tx.forEach(t=>{const f=fl[t.compte_id]=fl[t.compte_id]||{d:0,c:0},v=Number(t.montant);if(v<0)f.d+=v;else f.c+=v});
+ const B=[];
+ for(const fa of ["Comptes courants","Comptes autres","Bourse","Crypto"]){const rows=[];
+  for(const c of CPT.filter(x=>x.famille===fa)){const k=ck(c),a=bal(k,d0),b=bal(k,d1);if(a===null&&b===null)continue;
+   const s0=a===null?0:a,s1=b===null?s0:b,dl=s1-s0,x=fl[c.id];let d,cr,o=0;
+   if(x){d=x.d;cr=x.c;o=Math.round((dl-d-cr)*100)/100}else{d=Math.min(dl,0);cr=Math.max(dl,0)}
+   rows.push({n:c.nom,s0,d,c:cr,o,s1})}
+  if(rows.length)B.push({t:fa==="Comptes courants"?"Compte courant":fa==="Comptes autres"?"Comptes d’épargne":fa,rows})}
+ const pr=[];
+ for(const p of PR){const r=ec.find(e=>e.pret_id===p.id);if(!r)continue;const i=Number(r.interets||0),cp=Number(r.capital_rembourse||0);
+  pr.push({n:p.nom,s0:-Number(r.capital_debut),d:-i,c:cp+i,o:0,s1:-Number(r.capital_fin)})}
+ if(pr.length)B.push({t:"Prêts",rows:pr});
+ const f=n=>eur(n),sm=(rows,k)=>rows.reduce((t,r)=>t+r[k],0);
+ const tb=r=>`<table class="am2"><tr><td>Solde de début</td><td>${f(r.s0)}</td></tr><tr><td>Débit</td><td>${f(r.d)}</td></tr><tr><td>Crédit</td><td>${f(r.c)}</td></tr>${Math.abs(r.o)>=0.5?`<tr><td>Autres mouvements</td><td>${f(r.o)}</td></tr>`:""}<tr class="cur"><td>Solde de clôture</td><td>${f(r.s1)}</td></tr></table>`;
+ let h="";const G={s0:0,d:0,c:0,o:0,s1:0};
+ for(const b of B){const T={};for(const k in G){T[k]=sm(b.rows,k);G[k]+=T[k]}
+  h+=`<div class="card" data-b="${b.t}"><h3>${b.t}</h3>${tb(T)}`+(AOPEN[b.t]?`<div style="overflow-x:auto;margin-top:8px"><table class="am2"><tr><th>Compte</th><th>Début</th><th>Débit</th><th>Crédit</th><th>Autres</th><th>Fin</th></tr>${b.rows.map(r=>`<tr><td>${r.n}</td><td>${f(r.s0)}</td><td>${f(r.d)}</td><td>${f(r.c)}</td><td>${f(r.o)}</td><td>${f(r.s1)}</td></tr>`).join("")}</table></div>`:`<p class="mu" style="margin:6px 0 0">Appuyez pour le détail par compte</p>`)+`</div>`}
+ if(B.length)h+=`<div class="card" style="cursor:default"><h3>Situation globale</h3><table class="am2"><tr><td>Début</td><td>${f(G.s0)}</td></tr><tr><td>Débit</td><td>${f(G.d)}</td></tr><tr><td>Crédit</td><td>${f(G.c)}</td></tr>${Math.abs(G.o)>=0.5?`<tr><td>Autres mouvements</td><td>${f(G.o)}</td></tr>`:""}<tr><td>Fin</td><td>${f(G.s1)}</td></tr><tr class="cur"><td>Balance</td><td>${f(G.s1-G.s0)}</td></tr></table></div>`;
+ else h='<p class="mu">Aucun solde pour ce mois : importez soldes_historique.csv et vos fichiers de comptes.</p>';
+ $("yy").textContent=MO[AMo][0].toUpperCase()+MO[AMo].slice(1)+" "+AY;$("ya").innerHTML=h}
+$("yp").onclick=()=>{AMo--;if(AMo<0){AMo=11;AY--}loadAn()};
+$("yn").onclick=()=>{AMo++;if(AMo>11){AMo=0;AY++}loadAn()};
+$("ya").addEventListener("click",ev=>{const c=ev.target.closest(".card[data-b]");if(!c)return;AOPEN[c.dataset.b]=!AOPEN[c.dataset.b];renderAn()});
 let SELC=null;
-async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r})}catch(e){}}
+async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)})}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));
  const bal=c=>SO[ck(c)]?Number(SO[ck(c)].solde):null,fd=d=>d.split("-").reverse().join("/");
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
@@ -333,7 +348,7 @@ function renderCa(){$("park").appendChild($("txb"));
   h+=`<li class="gh"><span>${f}</span><span>${eur(tot)}</span></li>`;
   for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?"solde au "+fd(SO[ck(c)].date):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
  $("ca").innerHTML=h;
- if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";w.appendChild($("txb"));li.after(w)}}}
+ if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";const ps=POSL[SELC];if(ps&&ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0);w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th><th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${p.libelle}</td><td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:6})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td><td></td><td></td><td>${eur(t)}</td></tr></table></div>`)}w.appendChild($("txb"));li.after(w)}}}
 $("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;SELC=SELC===id?null:id;
  $("cpf").value=SELC===null||SELC==="*"?"":SELC;renderCa();if(SELC!==null)loadView()});
 $("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
@@ -445,12 +460,42 @@ async function impTxCsv(R,h){const ix=n=>h.indexOf(n),by={};let skip=0;
   (by[c.id]=by[c.id]||[]).push({date:r[ix("date")],libelle:r[ix("libelle")],montant:m,categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null,statut_cat:r[ix("statut_cat")]||"a_completer",compte_id:c.id,cle_doublon:KPc(c.id)+r[ix("cle_doublon")]})}
  let n=0;for(const id in by){await ins(by[id],"cle_doublon");n+=by[id].length}
  return n+" lignes traitées (doublons ignorés)"+(skip?" · "+skip+" ignorées : compte inconnu":"")}
+let POSL={};
+const CGID={BTC:"bitcoin",XBT:"bitcoin",ETH:"ethereum",WETH:"ethereum",SOL:"solana",DOGE:"dogecoin",PEPE:"pepe"};
+const symOf=l=>{const m=String(l).match(/\(([A-Za-z0-9]+)\)\s*$/);return (m?m[1]:String(l)).trim().toUpperCase()};
+async function refreshCrypto(){
+ const cs=CPT.filter(c=>c.famille==="Crypto");if(!cs.length)return "";
+ const P=[];for(const c of cs){const r=await all(()=>SB.from("positions").select("*").eq("compte_id",c.id).order("id"));if(!r.length)continue;const md=r.reduce((m,x)=>x.date>m?x.date:m,"");P.push(...r.filter(x=>x.date===md))}
+ if(!P.length)return "";
+ const ids=[...new Set(P.map(x=>CGID[symOf(x.libelle)]).filter(Boolean))];
+ const j=ids.length?await (await fetch("https://api.coingecko.com/api/v3/simple/price?ids="+ids.join(",")+"&vs_currencies=eur")).json():{};
+ const d=dstr(now),out=[],tot={};
+ for(const x of P){const sy=symOf(x.libelle),id=CGID[sy],pu=sy==="EUR"?1:(id&&j[id]&&j[id].eur);if(!pu)continue;
+  const v=Math.round(Number(x.quantite)*pu*100)/100;
+  out.push({compte_id:x.compte_id,date:d,libelle:x.libelle,quantite:x.quantite,prix_unitaire:pu,valeur:v});tot[x.compte_id]=(tot[x.compte_id]||0)+v}
+ if(out.length){const{error}=await SB.from("positions").upsert(out,{onConflict:"compte_id,date,libelle"});if(error)throw error;
+  for(const id in tot)await putSolde(CPT.find(c=>c.id===id),d,Math.round(tot[id]*100)/100)}
+ return "Cours mis à jour ("+out.length+" actifs)"}
+async function impKraken(R,h){const c=CPT.find(x=>x.produit==="Kraken");if(!c)throw new Error("compte Kraken introuvable");
+ const ix=n=>h.indexOf(n),d=dstr(now),rows=[];
+ for(const r of R.slice(1)){const a=(r[ix("asset")]||"").trim(),q=num2(r[ix("quantity")]);if(!a||a==="Total"||!q)continue;
+  rows.push({compte_id:c.id,date:d,libelle:a,quantite:q,valeur:a==="EUR"?q:0,prix_unitaire:a==="EUR"?1:null})}
+ const{error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error)throw error;
+ return c.nom+" : "+rows.length+" actifs (cours mis à jour ensuite)"}
+async function impPos(R,h){const ix=n=>h.indexOf(n),by={};
+ for(const r of R.slice(1)){const c=byNom(r[ix("compte")]);if(!c||!r[ix("libelle")])continue;(by[c.id]=by[c.id]||{c,rows:[]}).rows.push({compte_id:c.id,date:r[ix("date")],libelle:r[ix("libelle")],quantite:num2(r[ix("quantite")]),valeur:num2(r[ix("valeur")])})}
+ let n=0;const t=[];
+ for(const id in by){const{c,rows}=by[id],{error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error)throw error;
+  const tot=rows.reduce((a,x)=>a+x.valeur,0);await putSolde(c,rows[0].date,Math.round(tot*100)/100);n+=rows.length;t.push(c.nom+" "+eur(tot))}
+ return n+" positions ("+t.join(", ")+")"}
 async function importCsv(txt,name){
  const first=txt.replace(/^\ufeff/,"").split(/\r?\n/)[0],sep=first.split(";").length>first.split(",").length?";":",";
  const R=csv(txt,sep),h=R[0].map(s=>s.trim());
  if(h.includes("Date Opération")&&h.includes("Numéro Compte"))return impBourso(R,h);
  if(h.includes("Libellé Support")&&h.includes("ISIN"))return impPortef(R,name);
  if(h.includes("cle_doublon")&&h.includes("compte"))return impTxCsv(R,h);
+ if(h.includes("asset")&&h.includes("aclass")&&h.includes("quantity"))return impKraken(R,h);
+ if(h.includes("compte")&&h.includes("quantite")&&h.includes("valeur"))return impPos(R,h);
  if(h.includes("compte")&&h.includes("solde")&&h.includes("date"))return impSoldes(R,h);
  const ix=n=>h.indexOf(n);
  if(ix("mot_cle")>=0){const have=new Set(RULES.map(r=>r.mot_cle.toUpperCase()));
@@ -493,8 +538,10 @@ async function importFile(f){const n=f.name;
  return importCsv(t,n)}
 $("fi").onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const out=[];
  for(const f of fs){log("Lecture de "+f.name+"…");try{out.push("• "+f.name+" : "+await importFile(f))}catch(x){out.push("• "+f.name+" : erreur, "+x.message)}}
+ try{const m=await refreshCrypto();if(m)out.push("• "+m)}catch(x){out.push("• Cours des cryptos indisponibles : "+x.message)}
  try{await loadRef();await counts()}catch(x){}
  log(out.join("\n"));e.target.value=""};
+$("rk2").onclick=async()=>{try{log("Mise à jour des cours…");const m=await refreshCrypto();await loadSo();renderCa();log(m||"Aucune position crypto.")}catch(e){log("Cours indisponibles : "+e.message)}};
 $("rc").onclick=async()=>{try{await loadRef();const g=new Map();
  for(const r of REF){if(r.statut_cat!=="a_completer"&&r.statut_cat!=="suggeree")continue;const c=classify(r.libelle);
   if(c.statut_cat==="a_completer")continue;const k=[c.categorie,c.sous_categorie||"",c.statut_cat].join("\u0001");if(!g.has(k))g.set(k,[]);g.get(k).push(r.id)}
@@ -504,7 +551,7 @@ function show(on){$("lg").hidden=on;$("ap").hidden=!on}
 $("go").onclick=async()=>{$("lm").textContent="";
  const{error}=await SB.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
  if(error){$("lm").textContent="Connexion impossible : "+error.message+(error.status?" (code "+error.status+")":"");return}start()};
-async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}loadView()}
+async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}refreshCrypto().then(()=>loadSo().then(renderCa)).catch(()=>{});loadView()}
 SB.auth.getSession().then(({data})=>data.session?start():show(false));
 </script>
 </body>
