@@ -32,6 +32,7 @@ input,select{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(
 .nav{display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px}
 .nav button{width:40px;height:40px;border:1px solid var(--ln);border-radius:50%;background:var(--sf);color:var(--ink);font-size:20px;cursor:pointer}
 .chips{display:flex;gap:6px;margin-bottom:6px}
+.subs{display:flex;gap:6px;margin:10px 0}.subs button{flex:1;padding:9px;border:1px solid var(--ln);border-radius:10px;background:transparent;color:var(--ink);font:500 14px inherit;font-family:inherit;cursor:pointer}.subs button.on{background:var(--ink);color:var(--bg)}
 .chips button{padding:6px 12px;border:1px solid var(--ln);border-radius:16px;background:transparent;color:var(--ink);font:500 13px inherit;font-family:inherit;cursor:pointer}
 .chips button.on{background:var(--ink);color:var(--bg)}
 ul{list-style:none;margin:0;padding:0}
@@ -92,7 +93,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <select id="cpi" hidden></select>
   <label class="btn" for="fi">Choisir des fichiers</label><input id="fi" type="file" accept=".xlsx,.csv,.txt,.pdf" multiple hidden>
   <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button><button class="btn alt" id="rk2">Actualiser les cours des cryptos</button>
-  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (c) · paramètres, impôts, investissements</p>
+  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (d) · analyse par catégorie, soldes recomposés</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -102,9 +103,19 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <p class="mu">Les charges sont pointées automatiquement d’après vos opérations. Rond : pointer ou annuler à la main. Ligne : modifier le montant ou retirer la charge.</p>
  </div>
  <div id="v5" hidden>
-  <div class="nav"><button id="yp" aria-label="Mois précédent">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Mois suivant">›</button></div>
-  <div id="ya"></div>
-  <p class="mu">Soldes de fin de mois, débits et crédits par type de compte, comme l’onglet « Compte » de votre Excel.</p>
+  <div class="subs"><button id="as1" class="on">Par compte</button><button id="as2">Par catégorie</button></div>
+  <div id="an1">
+   <div class="nav"><button id="yp" aria-label="Mois précédent">‹</button><h2 id="yy"></h2><button id="yn" aria-label="Mois suivant">›</button></div>
+   <div id="ya"></div>
+   <p class="mu">Soldes recomposés à partir des opérations et du dernier solde connu de chaque compte. Appuyez sur un bloc pour le détail.</p>
+  </div>
+  <div id="an2" hidden>
+   <div class="nav"><button id="zp" aria-label="Année précédente">‹</button><h2 id="zy" style="font-size:16px"></h2><button id="zn" aria-label="Année suivante">›</button></div>
+   <select id="zm"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select>
+   <div id="zc" style="margin-top:10px"></div><div id="zl" class="mu" style="margin:4px 0 10px"></div>
+   <div style="overflow-x:auto"><table class="am2" id="zt"></table></div>
+   <p class="mu">Comptes courants, 12 mois glissants. Charges en négatif, dépenses en positif, comme l’onglet d’analyse de l’Excel.</p>
+  </div>
  </div>
  <div id="v7" hidden>
   <h2>Paramètres</h2>
@@ -125,8 +136,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 </main>
 <dialog id="sh">
  <h2 id="sl" style="font-size:15px;word-break:break-word"></h2><p class="mu" id="sa"></p>
- <label>Catégorie<input id="sc" list="dc" autocomplete="off"></label>
- <label>Sous-catégorie<input id="su" list="ds" autocomplete="off"></label>
+ <label>Catégorie<select id="sc"></select></label>
+ <label>Sous-catégorie<select id="su"></select></label>
  <datalist id="dc"></datalist><datalist id="ds"></datalist>
  <div class="row"><input type="checkbox" id="sim"><label for="sim" style="color:inherit">Appliquer aux lignes similaires (<span id="sn">0</span>)</label></div>
  <div class="row"><input type="checkbox" id="ru"><label for="ru" style="color:inherit">Créer une règle pour le mot-clé :</label></div>
@@ -146,8 +157,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 </dialog>
 <dialog id="rd"><h2 id="rdt" style="font-size:16px"></h2>
  <label>Mot-clé (contenu dans le libellé)<input id="rdk" autocomplete="off"></label>
- <label>Catégorie<input id="rdc" list="dc" autocomplete="off"></label>
- <label>Sous-catégorie<input id="rds" list="ds" autocomplete="off"></label>
+ <label>Catégorie<select id="rdc"></select></label>
+ <label>Sous-catégorie<select id="rds"></select></label>
  <button class="btn" id="rdv">Enregistrer</button><button class="btn alt" id="rdx" style="color:var(--late);border-color:var(--late)">Supprimer la règle</button><button class="btn alt" id="rdf">Fermer</button></dialog>
 <dialog id="ird"><h2 id="irt" style="font-size:16px"></h2>
  <label>Année<input id="ira" type="number" inputmode="numeric"></label><label>Libellé<input id="irl"></label>
@@ -194,13 +205,13 @@ function classify(lib){const u=lib.toUpperCase();
   if(t>=2){const[ca,su]=b.split("\u0001");return{categorie:ca,sous_categorie:su||null,statut_cat:"suggeree"}}}
  return{categorie:null,sous_categorie:null,statut_cat:"a_completer"}}
 async function counts(){
- const q=s=>SB.from("transactions").select("id",{count:"exact",head:true}).eq("statut_cat",s);
+ const q=s=>SB.from("transactions").select("id",{count:"exact",head:true}).eq("statut_cat",s).gte("date",FROM);
  const[a,b]=await Promise.all([q("a_completer"),q("suggeree")]);
  $("c1").textContent="À compléter ("+(a.count||0)+")";$("c2").textContent="Suggérées ("+(b.count||0)+")"}
 async function loadView(){
  let q=SB.from("transactions").select("*");
  if(F==="all"){const s=ymd(Y,M,1),e=ymd(M===11?Y+1:Y,(M+1)%12,1);q=q.gte("date",s).lt("date",e)}
- else q=q.eq("statut_cat",F==="todo"?"a_completer":"suggeree");
+ else q=q.eq("statut_cat",F==="todo"?"a_completer":"suggeree").gte("date",FROM);
  if($("cpf").value)q=q.eq("compte_id",$("cpf").value);
  const{data,error}=await q.order("date",{ascending:false}).order("libelle").limit(1000);
  if(error){toast("Erreur : "+error.message);return}
@@ -219,10 +230,10 @@ $("ls").addEventListener("click",async ev=>{
  if(ok){const r=ROWS[ok.dataset.ok];await upd([r.id],{statut_cat:"manuelle"});await loadRef();loadView();return}
  const li=ev.target.closest("li");if(!li)return;cur=ROWS[li.dataset.i];
  $("sl").textContent=cur.libelle;$("sa").textContent=cur.date+" · "+eur(cur.montant);
- $("sc").value=cur.categorie||"";$("su").value=cur.sous_categorie||"";subs();
+ fillSel($("sc"),CATNAMES,cur.categorie||"");fillSel($("su"),subsFor(cur.categorie||""),cur.sous_categorie||"");
  const k=norm(cur.libelle),n=REF.filter(r=>r.id!==cur.id&&r.statut_cat!=="manuelle"&&norm(r.libelle)===k).length;
  $("fx1").checked=false;$("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
-function subs(){$("ds").innerHTML=opts(subsFor($("sc").value.trim()))}
+function subs(){fillSel($("su"),subsFor($("sc").value),"")}
 $("sc").addEventListener("input",subs);
 $("sx").onclick=()=>$("sh").close();
 $("ssv").onclick=async()=>{const c=$("sc").value.trim(),s=$("su").value.trim();if(!c){toast("Choisissez une catégorie");return}
@@ -242,7 +253,7 @@ $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
 function tab(n){[1,2,4,5,6,7,8].forEach(v=>{$("v"+v).hidden=v!==n;$("t"+v).classList.toggle("on",v===n)})}
 $("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=()=>{tab(7);renderCat()};$("t8").onclick=()=>{tab(8);loadImp()};
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
-$("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);loadAn()};
+$("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);AS===2?loadCatAn():loadAn()};
 const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
 const SEED=[
 {id:"frais",libelle:"Frais bancaires",montant:-9.3,jour:1,mots_cles:["COTIS EUC"]},
@@ -329,22 +340,30 @@ $("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(
  if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
 $("fp").onclick=()=>{FM.m--;if(FM.m<0){FM.m=11;FM.y--}loadCF()};
 $("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
-let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={};
+let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={},AS=1,ZE={y:now.getFullYear(),m:now.getMonth()},ZX=null,ZMODE=1,TXB=null;
+const FROM="2026-01-01";
 const ymEnd=(y,m)=>ymd(y,m,new Date(y,m+1,0).getDate());
+async function loadTxAll(){const r=await all(()=>SB.from("transactions").select("compte_id,date,montant").order("id")),by={};
+ for(const t of r)(by[t.compte_id]=by[t.compte_id]||[]).push([t.date,Number(t.montant)]);
+ for(const k in by){by[k].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);let c=0;by[k]=by[k].map(x=>{c+=x[1];return[x[0],c]})}TXB=by}
+const cumTo=(cid,d)=>{const a=TXB&&TXB[cid];if(!a)return 0;let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m][0]<=d)lo=m+1;else hi=m}return lo?a[lo-1][1]:0};
+const balK=(k,d)=>{let b=null;for(const r of SOA)if(r.numero===k&&r.date<=d&&(!b||r.date>b.date))b=r;return b?Number(b.solde):null};
+function balC(c,d){let an=null;for(const r of SOA)if(r.numero===ck(c)&&(!an||r.date>an.date))an=r;
+ if(an&&TXB&&TXB[c.id])return Math.round((Number(an.solde)+cumTo(c.id,d)-cumTo(c.id,an.date))*100)/100;
+ return balK(ck(c),d)}
 async function loadAn(){try{
- const ASO=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));
+ if(!SOA.length)await loadSo();if(!TXB)await loadTxAll();
  const s=ymd(AY,AMo,1),e=ymd(AMo===11?AY+1:AY,(AMo+1)%12,1);
  const tx=await all(()=>SB.from("transactions").select("compte_id,montant").gte("date",s).lt("date",e).order("id"));
  const ec=await all(()=>SB.from("echeances").select("id,pret_id,capital_debut,interets,capital_rembourse,capital_fin").gte("date",s).lt("date",e).order("id"));
  if(!PR.length)PR=(await SB.from("prets").select("*").order("nom")).data||[];
- AX={ASO,tx,ec};renderAn()}catch(x){toast("Erreur : "+x.message)}}
+ AX={tx,ec};renderAn()}catch(x){toast("Erreur : "+x.message)}}
 function renderAn(){
- const{ASO,tx,ec}=AX,d0=ymEnd(AMo===0?AY-1:AY,(AMo+11)%12),d1=ymEnd(AY,AMo);
- const bal=(k,d)=>{let b=null;for(const r of ASO)if(r.numero===k&&r.date<=d&&(!b||r.date>b.date))b=r;return b?Number(b.solde):null};
+ const{tx,ec}=AX,d0=ymEnd(AMo===0?AY-1:AY,(AMo+11)%12),d1=ymEnd(AY,AMo);
  const fl={};tx.forEach(t=>{const f=fl[t.compte_id]=fl[t.compte_id]||{d:0,c:0},v=Number(t.montant);if(v<0)f.d+=v;else f.c+=v});
  const B=[];
  for(const fa of ["Comptes courants","Comptes autres","Bourse","Crypto"]){const rows=[];
-  for(const c of CPT.filter(x=>x.famille===fa)){const k=ck(c),a=bal(k,d0),b=bal(k,d1);if(a===null&&b===null)continue;
+  for(const c of CPT.filter(x=>x.famille===fa)){const a=balC(c,d0),b=balC(c,d1);if(a===null&&b===null)continue;
    const s0=a===null?0:a,s1=b===null?s0:b,dl=s1-s0,x=fl[c.id];let d,cr,o=0;
    if(x){d=x.d;cr=x.c;o=Math.round((dl-d-cr)*100)/100}else{d=Math.min(dl,0);cr=Math.max(dl,0)}
    rows.push({n:c.nom,s0,d,c:cr,o,s1})}
@@ -352,7 +371,7 @@ function renderAn(){
  const pr=[];
  for(const p of PR){const r=ec.find(e=>e.pret_id===p.id);let s0,s1,d,cr;
   if(r){const i=Number(r.interets||0),cp=Number(r.capital_rembourse||0);s0=-Number(r.capital_debut);s1=-Number(r.capital_fin);d=-i;cr=cp+i}
-  else{const a=bal(p.numero,d0),b=bal(p.numero,d1);if(a===null&&b===null)continue;s1=b===null?-Math.abs(a):-Math.abs(b);s0=a===null?s1:-Math.abs(a);const dl=s1-s0;d=Math.min(dl,0);cr=Math.max(dl,0)}
+  else{const a=balK(p.numero,d0),b=balK(p.numero,d1);if(a===null&&b===null)continue;s1=b===null?-Math.abs(a):-Math.abs(b);s0=a===null?s1:-Math.abs(a);const dl=s1-s0;d=Math.min(dl,0);cr=Math.max(dl,0)}
   const em=Number(p.montant_emprunte||0);
   pr.push({n:p.nom,s0,d,c:cr,o:0,s1,pct:em?Math.round((1-Math.abs(s1)/em)*1000)/10:null})}
  const f=n=>eur(n),sm=(rows,k)=>rows.reduce((t,r)=>t+r[k],0);
@@ -370,14 +389,45 @@ function renderAn(){
 $("yp").onclick=()=>{AMo--;if(AMo<0){AMo=11;AY--}loadAn()};
 $("yn").onclick=()=>{AMo++;if(AMo>11){AMo=0;AY++}loadAn()};
 $("ya").addEventListener("click",ev=>{const c=ev.target.closest(".card[data-b]");if(!c)return;AOPEN[c.dataset.b]=!AOPEN[c.dataset.b];renderAn()});
+const DEPL=["alimentation","course","maison","maison mureaux","santé","vêtement","achat","bébé","enfants","dab","retrait dab"];
+async function loadCatAn(){try{
+ const cf=(await SB.from("charges_fixes").select("*").eq("actif",true)).data||[];
+ const st=new Date(ZE.y,ZE.m-12,1),en=new Date(ZE.y,ZE.m+1,1);
+ const rows=await all(()=>fc(SB.from("transactions").select("date,montant,categorie,sous_categorie")).gte("date",dstr(st)).lt("date",dstr(en)).order("id"));
+ ZX={cf,rows};renderCatAn()}catch(e){toast("Erreur : "+e.message)}}
+function renderCatAn(){
+ const{cf,rows}=ZX,W=[];for(let i=0;i<12;i++){const d=new Date(ZE.y,ZE.m-11+i,1);W.push({y:d.getFullYear(),m:d.getMonth()})}
+ const Z=W.map(()=>({net:0,pv:0,fx:0,bar:0,res:0,vac:0,exc:0,dep:0,loi:0}));
+ for(const r of rows){let y=+r.date.slice(0,4),m=+r.date.slice(5,7)-1;if(ZMODE&&+r.date.slice(8)>=26){m++;if(m>11){m=0;y++}}
+  const i=W.findIndex(w=>w.y===y&&w.m===m);if(i<0)continue;const a=Z[i],v=Number(r.montant),c=(r.categorie||"").toLowerCase(),s=(r.sous_categorie||"").toLowerCase();
+  a.net+=v;if(c==="fixe")a.fx+=v;else if(c.startsWith("exceptionnel"))a.exc-=v;else if(c==="vacances")a.vac-=v;else if(c==="loisir")a.loi-=v;else if(DEPL.includes(c))a.dep-=v;
+  if(s==="bar")a.bar-=v;if(s==="restaurant")a.res-=v}
+ W.forEach((w,i)=>{Z[i].pv=occF(w.y,w.m,cf).filter(x=>Number(x.c.montant)<0).reduce((t,x)=>t+Number(x.c.montant),0)});
+ const f2=n=>Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const K=["net","pv","fx","df","bar","res","vac","exc","dep","loi"],H=["Mois","Balance","Fixe prévu","Fixe payé","Différence","Bar","Restaurant","Vacances","Exceptionnelle","Dépense","Loisir"];
+ Z.forEach(a=>a.df=a.fx-a.pv);const T={net:0,pv:0,fx:0,df:0,bar:0,res:0,vac:0,exc:0,dep:0,loi:0};Z.forEach(a=>K.forEach(k=>T[k]+=a[k]));
+ const row=(l,a,em)=>"<tr><td>"+l+"</td>"+K.map(k=>"<td>"+(em?"":f2(a[k]))+"</td>").join("")+"</tr>";
+ const fut=(w)=>w.y>now.getFullYear()||(w.y===now.getFullYear()&&w.m>now.getMonth());
+ $("zt").innerHTML="<tr>"+H.map(x=>"<th>"+x+"</th>").join("")+"</tr>"+W.map((w,i)=>row(MO[w.m].slice(0,4)+". "+String(w.y).slice(2),Z[i],fut(w))).join("")+row("Total",T,false).replace("<tr>",'<tr class="cur">');
+ const segs=Z.map(a=>[Math.max(-a.fx,0),Math.max(a.dep,0),Math.max(a.loi,0),Math.max(a.exc,0),Math.max(a.vac,0)]),mx=Math.max(1,...segs.map(s=>s.reduce((x,y)=>x+y,0)));
+ const col=["#0f4c5c","#2f9e8f","#e0a526","#c2412b","#7a5cc2"],nm=["Fixe payé","Dépense","Loisir","Exceptionnelle","Vacances"];
+ let svg=`<svg viewBox="0 0 360 200" width="100%" role="img" aria-label="Dépenses par catégorie et par mois"><text x="2" y="12" font-size="9" fill="currentColor">${eur(mx)}</text><line x1="0" y1="170" x2="360" y2="170" stroke="currentColor" stroke-opacity=".25"/>`;
+ segs.forEach((sg,i)=>{let y=170;const x=10+i*29;sg.forEach((v,j)=>{const h=v/mx*148;y-=h;if(h>0.3)svg+=`<rect x="${x}" y="${y.toFixed(1)}" width="21" height="${h.toFixed(1)}" fill="${col[j]}"/>`});
+  svg+=`<text x="${x+10.5}" y="184" font-size="8" text-anchor="middle" fill="currentColor">${MO[W[i].m].slice(0,3)}</text>`});
+ svg+="</svg>";
+ $("zc").innerHTML=svg;$("zl").innerHTML=nm.map((n,j)=>`<span style="display:inline-block;margin-right:10px"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${col[j]};margin-right:4px"></i>${n}</span>`).join("");
+ $("zy").textContent=MO[W[0].m].slice(0,4)+". "+W[0].y+" – "+MO[W[11].m].slice(0,4)+". "+W[11].y}
+$("zp").onclick=()=>{ZE.y--;loadCatAn()};$("zn").onclick=()=>{ZE.y++;loadCatAn()};$("zm").onchange=()=>{ZMODE=+$("zm").value;loadCatAn()};
+$("as1").onclick=()=>{AS=1;$("an1").hidden=false;$("an2").hidden=true;$("as1").classList.add("on");$("as2").classList.remove("on");loadAn()};
+$("as2").onclick=()=>{AS=2;$("an1").hidden=true;$("an2").hidden=false;$("as2").classList.add("on");$("as1").classList.remove("on");loadCatAn()};
 let SELC=null;
-async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYSUM=((await SB.from("transactions").select("montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).reduce((a,x)=>a+Math.abs(Number(x.montant)),0)}catch(e){}}
+async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYSUM=((await SB.from("transactions").select("montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).reduce((a,x)=>a+Math.abs(Number(x.montant)),0);if(!TXB)await loadTxAll()}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0].toUpperCase()+MO[M].slice(1)+" "+Y;
- const me=ymEnd(Y,M),rowAt=c=>{let b=null;for(const r of SOA)if(r.numero===ck(c)&&r.date<=me&&(!b||r.date>b.date))b=r;return b},invBal=c=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYSUM:0),bal=c=>c.produit==="Investissement"?invBal(c):(rowAt(c)?Number(rowAt(c).solde):null),fd=d=>d.split("-").reverse().join("/");
+ const me=ymEnd(Y,M),rowAt=c=>{let b=null;for(const r of SOA)if(r.numero===ck(c)&&r.date<=me&&(!b||r.date>b.date))b=r;return b},invBal=c=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYSUM:0),bal=c=>c.produit==="Investissement"?invBal(c):balC(c,me),fd=d=>d.split("-").reverse().join("/");
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
  for(const f of [...new Set(CPT.map(c=>c.famille))]){const cs=CPT.filter(c=>c.famille===f),tot=cs.reduce((t,c)=>t+(bal(c)||0),0);
   h+=`<li class="gh"><span>${f}</span><span>${eur(tot)}</span></li>`;
-  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?(c.produit==="Investissement"?(c.echeance?"échéance "+fd(c.echeance):"investissement"):"solde au "+fd(rowAt(c).date)):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
+  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?(c.produit==="Investissement"?(c.echeance?"échéance "+fd(c.echeance):"investissement"):"solde au "+fd(me<dstr(now)?me:dstr(now))):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
  $("ca").innerHTML=h;
  if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";const ps=POSL[SELC];if(ps&&ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0);w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th><th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${p.libelle}</td><td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:6})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td><td></td><td></td><td>${eur(t)}</td></tr></table></div>`)}w.appendChild($("txb"));li.after(w)}}}
 $("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;SELC=SELC===id?null:id;
@@ -571,7 +621,7 @@ async function importFile(f){const n=f.name;
 $("fi").onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const out=[];
  for(const f of fs){log("Lecture de "+f.name+"…");try{out.push("• "+f.name+" : "+await importFile(f))}catch(x){out.push("• "+f.name+" : erreur, "+x.message)}}
  try{const m=await refreshCrypto();if(m)out.push("• "+m)}catch(x){out.push("• Cours des cryptos indisponibles : "+x.message)}
- try{await loadRef();await counts()}catch(x){}
+ TXB=null;try{await loadRef();await counts()}catch(x){}
  log(out.join("\n"));e.target.value=""};
 $("rk2").onclick=async()=>{try{log("Mise à jour des cours…");const m=await refreshCrypto();await loadSo();renderCa();log(m||"Aucune position crypto.")}catch(e){log("Cours indisponibles : "+e.message)}};
 $("rc").onclick=async()=>{try{log("Recatégorisation en cours…");await loadRef();
@@ -587,6 +637,8 @@ async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Err
 let CAT=[],SOA=[],COPEN={},RD=null;
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
 const opts=a=>a.map(s=>`<option value="${esc(s)}">`).join("");
+let CATNAMES=[];
+const fillSel=(el,list,v)=>{const a=[...list];if(v&&!a.includes(v))a.push(v);el.innerHTML='<option value="">—</option>'+opts(a);el.value=v||""};
 function subsFor(c){return [...new Set(CAT.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))].sort((a,b)=>a.localeCompare(b,"fr"))}
 async function syncCat(){
  try{CAT=await all(()=>SB.from("categories").select("*").order("id"));
@@ -596,7 +648,7 @@ async function syncCat(){
   if(miss.size){const rows=[...miss.values()];for(let i=0;i<rows.length;i+=300){const{error}=await SB.from("categories").upsert(rows.slice(i,i+300),{onConflict:"categorie,sous_categorie"});if(error)throw error}CAT=CAT.concat(rows)}}
  catch(e){CAT=[]}
  const names=[...new Set([...CAT.map(c=>c.categorie),...REF.map(r=>r.categorie).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"fr"));
- $("dc").innerHTML=opts(names)}
+ CATNAMES=names;fillSel($("sc"),names,$("sc").value);fillSel($("rdc"),names,$("rdc").value)}
 function renderCat(){
  const cn={},rn={},inc=(o,k)=>{o[k]=(o[k]||0)+1};
  REF.forEach(r=>{if(!r.categorie)return;inc(cn,r.categorie+"|");if(r.sous_categorie)inc(cn,r.categorie+"|"+r.sous_categorie)});
@@ -644,8 +696,8 @@ $("cl").addEventListener("click",async ev=>{
 $("ca1").onclick=async()=>{const n=(prompt("Nom de la nouvelle catégorie :")||"").trim();if(!n)return;
  const{error}=await SB.from("categories").upsert({categorie:n,sous_categorie:""},{onConflict:"categorie,sous_categorie"});
  if(error){toast("Erreur : "+error.message);return}await loadRef();COPEN[n]=true;renderCat()};
-const rdSubs=()=>{$("ds").innerHTML=opts(subsFor($("rdc").value.trim()))};
-const rdOpen=r=>{RD=r;$("rdt").textContent=r?"Modifier la règle":"Nouvelle règle";$("rdk").value=r?r.mot_cle:"";$("rdc").value=r&&r.categorie||"";$("rds").value=r&&r.sous_categorie||"";$("rdx").hidden=!r;rdSubs();$("rd").showModal()};
+const rdSubs=()=>fillSel($("rds"),subsFor($("rdc").value),"");
+const rdOpen=r=>{RD=r;$("rdt").textContent=r?"Modifier la règle":"Nouvelle règle";$("rdk").value=r?r.mot_cle:"";fillSel($("rdc"),CATNAMES,r&&r.categorie||"");fillSel($("rds"),subsFor(r&&r.categorie||""),r&&r.sous_categorie||"");$("rdx").hidden=!r;$("rd").showModal()};
 $("rdc").addEventListener("input",rdSubs);$("ra").onclick=()=>rdOpen(null);$("rdf").onclick=()=>$("rd").close();
 $("rl").addEventListener("click",ev=>{const li=ev.target.closest("li[data-r]");if(li)rdOpen(RULES.find(r=>String(r.id)===li.dataset.r))});
 $("rdv").onclick=async()=>{const k=$("rdk").value.trim(),c=$("rdc").value.trim(),s=$("rds").value.trim();if(!k||!c){toast("Mot-clé et catégorie requis");return}
