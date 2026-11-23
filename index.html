@@ -93,7 +93,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <select id="cpi" hidden></select>
   <label class="btn" for="fi">Choisir des fichiers</label><input id="fi" type="file" accept=".xlsx,.csv,.txt,.pdf" multiple hidden>
   <button class="btn alt" id="rc">Recatégoriser les lignes à compléter</button><button class="btn alt" id="rk2">Actualiser les cours des cryptos</button>
-  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (d) · analyse par catégorie, soldes recomposés</p>
+  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (e) · investissements dans l’analyse</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -368,6 +368,9 @@ function renderAn(){
    if(x){d=x.d;cr=x.c;o=Math.round((dl-d-cr)*100)/100}else{d=Math.min(dl,0);cr=Math.max(dl,0)}
    rows.push({n:c.nom,s0,d,c:cr,o,s1})}
   if(rows.length)B.push({t:fa==="Comptes courants"?"Compte courant":fa==="Comptes autres"?"Comptes d’épargne":fa,rows})}
+ const inv=[],invAt=(c,d)=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYTX.filter(x=>x.d<=d).reduce((t,x)=>t+x.a,0):0);
+ for(const c of CPT.filter(x=>x.famille==="Investissements")){const a=invAt(c,d0),b=invAt(c,d1),dl=b-a;inv.push({n:c.nom,s0:a,d:Math.min(dl,0),c:Math.max(dl,0),o:0,s1:b})}
+ if(inv.length)B.push({t:"Investissements",rows:inv});
  const pr=[];
  for(const p of PR){const r=ec.find(e=>e.pret_id===p.id);let s0,s1,d,cr;
   if(r){const i=Number(r.interets||0),cp=Number(r.capital_rembourse||0);s0=-Number(r.capital_debut);s1=-Number(r.capital_fin);d=-i;cr=cp+i}
@@ -421,7 +424,7 @@ $("zp").onclick=()=>{ZE.y--;loadCatAn()};$("zn").onclick=()=>{ZE.y++;loadCatAn()
 $("as1").onclick=()=>{AS=1;$("an1").hidden=false;$("an2").hidden=true;$("as1").classList.add("on");$("as2").classList.remove("on");loadAn()};
 $("as2").onclick=()=>{AS=2;$("an1").hidden=true;$("an2").hidden=false;$("as2").classList.add("on");$("as1").classList.remove("on");loadCatAn()};
 let SELC=null;
-async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYSUM=((await SB.from("transactions").select("montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).reduce((a,x)=>a+Math.abs(Number(x.montant)),0);if(!TXB)await loadTxAll()}catch(e){}}
+async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYTX=((await SB.from("transactions").select("date,montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).map(x=>({d:x.date,a:Math.abs(Number(x.montant))}));PONYSUM=PONYTX.reduce((t,x)=>t+x.a,0);if(!TXB)await loadTxAll()}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0].toUpperCase()+MO[M].slice(1)+" "+Y;
  const me=ymEnd(Y,M),rowAt=c=>{let b=null;for(const r of SOA)if(r.numero===ck(c)&&r.date<=me&&(!b||r.date>b.date))b=r;return b},invBal=c=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYSUM:0),bal=c=>c.produit==="Investissement"?invBal(c):balC(c,me),fd=d=>d.split("-").reverse().join("/");
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
@@ -751,7 +754,7 @@ $("irv").onclick=async()=>{const v={annee:parseInt($("ira").value),libelle:$("ir
  if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
 $("irx").onclick=async()=>{if(!confirm("Supprimer cette ligne ?"))return;const{error}=await SB.from("impots").delete().eq("id",RI.id);
  if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
-let PONYSUM=0;
+let PONYSUM=0,PONYTX=[];
 
 </script>
 </body>
