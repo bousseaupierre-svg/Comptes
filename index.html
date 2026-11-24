@@ -116,7 +116,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version du 24/11 · tableau de bord, patrimoine, placements et immobilier</p>
+  <div id="log"></div><p class="mu" id="ver">Version v8 du 24/11 · historique des placements, DCA-Crypto et PER Pierre</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -176,6 +176,20 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
    <div class="kpi"><div class="l">Variation depuis valorisation précédente</div><div class="v" id="invchange">—</div></div>
    <div class="kpi"><div class="l">Performance estimée</div><div class="v" id="invperf">—</div><div class="l">Après neutralisation des flux identifiés</div></div>
   </div>
+  <div class="card" style="cursor:default;margin-top:14px">
+   <h3>Achats DCA-Crypto (BTC)</h3>
+   <p class="mu">Saisis chaque achat hebdomadaire. L’opération est enregistrée dans Opérations avec la catégorie Placements › DCA-Crypto. La quantité et le prix du BTC sont conservés dans la note.</p>
+   <label class="mu">Compte débité<select id="dcaAccount"></select></label>
+   <div class="choice-grid" style="grid-template-columns:1fr 1fr">
+    <label class="mu">Date<input id="dcaDate" type="date"></label>
+    <label class="mu">Montant investi (€)<input id="dcaAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="30"></label>
+    <label class="mu">Quantité BTC<input id="dcaQty" type="number" min="0" step="0.00000001" inputmode="decimal" placeholder="0,0003"></label>
+    <label class="mu">Prix du BTC (€)<input id="dcaPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 78000"></label>
+   </div>
+   <button type="button" class="btn" id="dcaSave">Enregistrer l’achat</button>
+   <div id="dcaSummary" style="margin-top:12px"></div>
+   <div id="dcaHistory"></div>
+  </div>
   <div id="investmentRows"></div>
   <p class="mu">Pour Trade Republic, les titres sont séparés des espèces : les espèces sont identifiées dans les positions (EUR / liquidités) ou calculées par différence entre le solde du compte et la valeur des titres.</p>
  </div>
@@ -218,7 +232,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="rdv">Enregistrer</button><button class="btn alt" id="rdx" style="color:var(--late);border-color:var(--late)">Supprimer la règle</button><button class="btn alt" id="rdf">Fermer</button></dialog>
 <dialog id="ird"><h2 id="irt" style="font-size:16px"></h2>
  <label>Année<input id="ira" type="number" inputmode="numeric"></label><label>Libellé<input id="irl"></label>
- <label>Montant investi (€)<input id="iri" type="number" step="0.01" inputmode="decimal"></label><label>Réduction d’impôt (€)<input id="irr" type="number" step="0.01" inputmode="decimal"></label>
+ <label>Montant investi (€)<input id="iri" type="number" step="0.01" inputmode="decimal"></label><label>Taux de réduction estimé (%)<input id="irtaux" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Ex. 25"></label><label>Réduction d’impôt (€) — calculée ou ajustable<input id="irr" type="number" step="0.01" inputmode="decimal"></label>
  <label>Date de remboursement (laisser vide si non remboursé)<input id="irdt" type="date"></label>
  <label>Note<input id="irn"></label>
  <button class="btn" id="irv">Enregistrer</button><button class="btn alt" id="irx" style="color:var(--late);border-color:var(--late)">Supprimer</button><button class="btn alt" id="irf">Fermer</button></dialog>
@@ -720,12 +734,59 @@ async function impKraken(R,h){const c=CPT.find(x=>x.produit==="Kraken");if(!c)th
   rows.push({compte_id:c.id,date:d,libelle:a,quantite:q,valeur:a==="EUR"?q:0,prix_unitaire:a==="EUR"?1:null})}
  const{error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error)throw error;
  return c.nom+" : "+rows.length+" actifs (cours mis à jour ensuite)"}
+const NON_ASSET_LABEL=/^(investi|épargne|epargne|plus[- ]?value|variation mois|achat)$/i;
+function positionValue(batch){
+ const rows=batch||[];
+ const total=rows.find(x=>/^total$/i.test(String(x.libelle||"")));
+ if(total)return Number(total.valeur||0);
+ const solde=rows.find(x=>/^solde$/i.test(String(x.libelle||"")));
+ if(solde)return Number(solde.valeur||0);
+ const assets=rows.filter(x=>!NON_ASSET_LABEL.test(String(x.libelle||"")));
+ return (assets.length?assets:rows).reduce((a,x)=>a+Number(x.valeur||0),0);
+}
+async function impHistValorisations(R,h){
+ const ix=n=>h.indexOf(n),by={};let skipped=0;
+ const iLabel=ix("actif")>=0?ix("actif"):ix("libelle")>=0?ix("libelle"):ix("indicateur");
+ const iValue=ix("valeur_eur")>=0?ix("valeur_eur"):ix("valeur");
+ if(ix("compte")<0||ix("date")<0||iLabel<0||iValue<0)throw new Error("Colonnes attendues : compte;date;actif;valeur_eur");
+ for(const r of R.slice(1)){
+  const c=byNom(String(r[ix("compte")]||"").trim()),date=String(r[ix("date")]||"").trim(),label=String(r[iLabel]||"").trim(),value=num2(r[iValue]);
+  if(!c||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!label||!Number.isFinite(value)){skipped++;continue}
+  (by[c.id]=by[c.id]||{c,rows:[]}).rows.push({compte_id:c.id,date,libelle:label,quantite:ix("quantite")>=0?num2(r[ix("quantite")]):0,valeur:value});
+ }
+ let n=0,summary=[];
+ for(const id in by){
+  const {c,rows}=by[id];
+  // If a date contains asset-level rows, ignore a duplicate portfolio Total row to avoid double counting.
+  const clean=rows;
+  const {error}=await SB.from("positions").upsert(clean,{onConflict:"compte_id,date,libelle"});if(error)throw error;
+  const dates=[...new Set(clean.map(x=>x.date))].sort();
+  for(const date of dates){const v=positionValue(clean.filter(x=>x.date===date));await putSolde(c,date,Math.round(v*100)/100)}
+  n+=clean.length;const last=dates[dates.length-1],v=positionValue(clean.filter(x=>x.date===last));summary.push(c.nom+" : "+eur(v)+" au "+last);
+ }
+ return n+" valorisations importées ("+summary.join(" · ")+")"+(skipped?" · "+skipped+" lignes ignorées : compte/date/valeur non reconnus":"");
+}
 async function impPos(R,h){const ix=n=>h.indexOf(n),by={};
  for(const r of R.slice(1)){const c=byNom(r[ix("compte")]);if(!c||!r[ix("libelle")])continue;(by[c.id]=by[c.id]||{c,rows:[]}).rows.push({compte_id:c.id,date:r[ix("date")],libelle:r[ix("libelle")],quantite:num2(r[ix("quantite")]),valeur:num2(r[ix("valeur")])})}
  let n=0;const t=[];
  for(const id in by){const{c,rows}=by[id],{error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error)throw error;
-  const tot=rows.reduce((a,x)=>a+x.valeur,0);await putSolde(c,rows[0].date,Math.round(tot*100)/100);n+=rows.length;t.push(c.nom+" "+eur(tot))}
+  const dates=[...new Set(rows.map(x=>x.date))].sort();for(const d of dates){const tot=rows.filter(x=>x.date===d).reduce((a,x)=>a+x.valeur,0);await putSolde(c,d,Math.round(tot*100)/100)}
+  n+=rows.length;const last=dates[dates.length-1],tot=rows.filter(x=>x.date===last).reduce((a,x)=>a+x.valeur,0);t.push(c.nom+" "+eur(tot)+" au "+last)}
  return n+" positions ("+t.join(", ")+")"}
+
+async function impImpots(R,h){
+ const ix=n=>h.indexOf(n),rows=[];let skip=0;
+ const existing=IMP.length?IMP:((await SB.from("impots").select("annee,libelle")).data||[]);
+ for(const r of R.slice(1)){
+  const year=parseInt(r[ix("annee")]),label=String(r[ix("libelle")]||"").trim();if(!year||!label){skip++;continue}
+  if(existing.some(x=>Number(x.annee)===year&&x.libelle===label)){skip++;continue}
+  const invested=num2(r[ix("montant_investi")]),rate=ix("taux_reduction")>=0&&r[ix("taux_reduction")]!==""?num2(r[ix("taux_reduction")]):null;
+  const reduction=rate!==null?Math.round(invested*rate)/100:num2(r[ix("reduction")]);
+  rows.push({annee:year,libelle:label,montant_investi:invested,taux_reduction:rate,reduction,date_remboursement:r[ix("date_remboursement")]||null,note:ix("note")>=0?(r[ix("note")]||null):null});
+ }
+ if(rows.length){const{error}=await SB.from("impots").insert(rows);if(error)throw error;await loadImp()}
+ return rows.length+" lignes fiscales importées"+(skip?" · "+skip+" ignorées (vides ou déjà présentes)":"");
+}
 async function importCsv(txt,name){
  const first=txt.replace(/^\ufeff/,"").split(/\r?\n/)[0],sep=first.split(";").length>first.split(",").length?";":",";
  const R=csv(txt,sep),h=R[0].map(s=>s.trim());
@@ -733,8 +794,10 @@ async function importCsv(txt,name){
  if(h.includes("Libellé Support")&&h.includes("ISIN"))return impPortef(R,name);
  if(h.includes("cle_doublon")&&h.includes("compte"))return impTxCsv(R,h);
  if(h.includes("asset")&&h.includes("aclass")&&h.includes("quantity"))return impKraken(R,h);
+ if(h.includes("compte")&&h.includes("date")&&(h.includes("actif")||h.includes("libelle")||h.includes("indicateur"))&&(h.includes("valeur_eur")||h.includes("valeur")))return impHistValorisations(R,h);
  if(h.includes("compte")&&h.includes("quantite")&&h.includes("valeur"))return impPos(R,h);
  if(h.includes("compte")&&h.includes("solde")&&h.includes("date"))return impSoldes(R,h);
+ if(h.includes("annee")&&h.includes("libelle")&&h.includes("montant_investi")&&h.includes("reduction"))return impImpots(R,h);
  const ix=n=>h.indexOf(n);
  if(ix("mot_cle")>=0){const have=new Set(RULES.map(r=>r.mot_cle.toUpperCase()));
   const rows=R.slice(1).filter(r=>r[ix("mot_cle")]&&!have.has(r[ix("mot_cle")].toUpperCase())).map(r=>({mot_cle:r[ix("mot_cle")],categorie:r[ix("categorie")]||null,sous_categorie:r[ix("sous_categorie")]||null}));
@@ -882,11 +945,12 @@ SB.auth.getSession().then(async({data})=>{let l=0;try{l=+(localStorage.getItem("
  if(data.session&&(!l||Date.now()-l<IDLE)){touch();start()}
  else{if(data.session)await SB.auth.signOut();show(false)}});
 
-let IMP=[],DONS=[],IOPEN={},RI=null,TAX_LOADED=false;
+let IMP=[],DONS=[],TAX_REFUNDS=[],IOPEN={},RI=null,TAX_LOADED=false;
 const DON_PREFIX="__DONS__";
 async function loadTaxData(){
  IMP=(await SB.from("impots").select("*").order("annee",{ascending:false})).data||[];
  DONS=await all(()=>fc(SB.from("transactions").select("id,date,libelle,montant,categorie,sous_categorie")).or("sous_categorie.ilike.%don%,categorie.ilike.%don%").lt("montant",0).order("id"));
+ TAX_REFUNDS=await all(()=>SB.from("transactions").select("date,libelle,montant").gt("montant",0).or("libelle.ilike.%impot%,libelle.ilike.%DGFIP%,libelle.ilike.%finances publiques%,libelle.ilike.%tresor%"));
  TAX_LOADED=true;
 }
 async function loadImp(){try{await loadTaxData();renderImp()}catch(e){toast("Erreur : "+e.message)}}
@@ -895,9 +959,16 @@ const donationRate=y=>{const r=donationMeta(y),v=r&&r.taux_reduction!=null?Numbe
 const donationRefundDate=y=>{const r=donationMeta(y);return r&&r.date_remboursement?r.date_remboursement:null};
 function donationAmountAt(y,cutoff){return DONS.filter(d=>Number(d.date.slice(0,4))===Number(y)&&d.date<=cutoff).reduce((a,d)=>a-Number(d.montant),0)*donationRate(y)/100}
 function taxReceivableAt(cutoff){
- let total=0;const years=[...new Set(DONS.map(d=>d.date.slice(0,4)))];
- for(const y of years){const rd=donationRefundDate(y);if(!rd||rd>cutoff)total+=donationAmountAt(y,cutoff)}
- for(const r of IMP){if(r.libelle===DON_PREFIX)continue;const amount=Number(r.reduction||0),rd=r.date_remboursement||null;if(!rd||rd>cutoff)total+=amount}
+ // Seules les réductions saisies comme lignes dans l'onglet Impôts alimentent la créance.
+ // Les dons détectés automatiquement restent un suivi informatif et ne sont pas ajoutés ici.
+ let total=0;
+ const usedRefunds=new Set();
+ for(const r of IMP){if(r.libelle===DON_PREFIX)continue;const amount=Number(r.reduction||0),rd=r.date_remboursement||null;
+  if(!rd||rd>cutoff){total+=amount;continue}
+  // Ne libérer la créance qu'une fois l'encaissement réellement visible dans les opérations.
+  const idx=TAX_REFUNDS.findIndex((t,i)=>!usedRefunds.has(i)&&t.date<=cutoff&&t.date>=rd.slice(0,4)+"-01-01"&&Math.abs(Number(t.montant)-amount)<=1.01);
+  if(idx>=0)usedRefunds.add(idx);else total+=amount;
+ }
  return Math.round(total*100)/100;
 }
 function renderImp(){
@@ -928,7 +999,7 @@ $("idn").addEventListener("click",async ev=>{
  const li=ev.target.closest("li[data-y]");if(li&&ev.target.closest(".lb")){IOPEN[li.dataset.y]=!IOPEN[li.dataset.y];renderImp()}
 });
 const irOpen=r=>{RI=r;$("irt").textContent=r?"Modifier la ligne":"Nouvelle ligne";$("ira").value=r?r.annee:now.getFullYear();$("irl").value=r?r.libelle:"Girardin";
- $("iri").value=r&&r.montant_investi!=null?r.montant_investi:"";$("irr").value=r&&r.reduction!=null?r.reduction:"";$("irdt").value=r&&r.date_remboursement||"";$("irn").value=r&&r.note||"";$("irx").hidden=!r;$("ird").showModal()};
+ $("iri").value=r&&r.montant_investi!=null?r.montant_investi:"";$("irtaux").value=r&&r.taux_reduction!=null?r.taux_reduction:"";$("irr").value=r&&r.reduction!=null?r.reduction:"";$("irdt").value=r&&r.date_remboursement||"";$("irn").value=r&&r.note||"";$("irx").hidden=!r;$("ird").showModal()};
 $("ig").addEventListener("click",async ev=>{
  const del=ev.target.closest("button[data-del-i]");
  if(del){ev.stopPropagation();const id=del.dataset.delI||del.getAttribute("data-del-i"),r=IMP.find(x=>String(x.id)===String(id));if(!r)return;
@@ -938,7 +1009,11 @@ $("ig").addEventListener("click",async ev=>{
  const li=ev.target.closest("li[data-i]");if(li)irOpen(IMP.find(r=>String(r.id)===li.dataset.i))
 });
 $("ig2").onclick=()=>irOpen(null);$("irf").onclick=()=>$("ird").close();
-$("irv").onclick=async()=>{const v={annee:parseInt($("ira").value),libelle:$("irl").value.trim(),montant_investi:parseFloat($("iri").value)||0,reduction:parseFloat($("irr").value)||0,date_remboursement:$("irdt").value||null,note:$("irn").value.trim()||null};
+$("irtaux").oninput=()=>{const invest=parseFloat($("iri").value),rate=parseFloat($("irtaux").value);if(Number.isFinite(invest)&&Number.isFinite(rate)&&rate>=0&&rate<=100)$("irr").value=(invest*rate/100).toFixed(2)};
+$("iri").oninput=()=>$("irtaux").dispatchEvent(new Event("input"));
+$("irv").onclick=async()=>{const invested=parseFloat($("iri").value)||0,rateRaw=$("irtaux").value.trim(),rate=rateRaw===""?null:parseFloat(rateRaw),manual=parseFloat($("irr").value)||0;
+ if(rate!==null&&(!Number.isFinite(rate)||rate<0||rate>100)){toast("Le taux doit être compris entre 0 et 100 %");return}
+ const v={annee:parseInt($("ira").value),libelle:$("irl").value.trim(),montant_investi:invested,taux_reduction:rate,reduction:rate===null?manual:Math.round(invested*rate)/100,date_remboursement:$("irdt").value||null,note:$("irn").value.trim()||null};
  if(!v.annee||!v.libelle){toast("Année et libellé requis");return}
  const{error}=RI?await SB.from("impots").update(v).eq("id",RI.id):await SB.from("impots").insert(v);
  if(error){toast("Erreur : "+error.message);return}$("ird").close();await loadImp();if(AX)renderAn()};
@@ -959,6 +1034,7 @@ const ownFor=c=>{
  if(OWNER_MAP[c.id])return OWNER_MAP[c.id];
  const n=String(c.nom||"").toLowerCase(),pr=String(c.produit||"").toLowerCase(),tit=String(c.titulaire||"").toLowerCase(),fam=String(c.famille||"").toLowerCase();
  if(pr.includes("pony")||n.includes("pony"))return "Marion";
+ if(/per.?pierre/i.test(pr+" "+n))return "Pierre";
  if(pr.includes("kraken")||n.includes("kraken")||pr.includes("trade republic")||n.includes("trade republic")||n.includes("boursorama")||n.includes("bourso"))return "Pierre";
  if(/enfant|valentin|ana[eé]/i.test(n+" "+tit))return "Enfants";
  if(/joint|commun/i.test(n+" "+tit))return "Joint";
@@ -1080,35 +1156,68 @@ async function loadInvestments(){
  try{
   await ensureFinanceData();
   const rows=await all(()=>SB.from("positions").select("*").order("date"));
-  const invAccounts=CPT.filter(c=>!(/compte liquidit[ée] pea/i.test(String(c.produit||"")))&&(["Investissements","Bourse","Crypto"].includes(c.famille)||/trade.?republic|kraken|pea|assurance.?vie|pony/i.test((c.nom||"")+" "+(c.produit||""))));
+  const invAccounts=CPT.filter(c=>!(/compte liquidit[ée] pea/i.test(String(c.produit||"")))&&(["Investissements","Bourse","Crypto"].includes(c.famille)||/trade.?republic|kraken|pea|assurance.?vie|pony|per.?pierre/i.test((c.nom||"")+" "+(c.produit||""))));
   let total=0,delta=0,perf=0;const out=[];
   for(const c of invAccounts){
    const allp=rows.filter(x=>x.compte_id===c.id),dates=[...new Set(allp.map(x=>x.date))].sort();
    const last=dates[dates.length-1],prev=dates.length>1?dates[dates.length-2]:null;
    const snap=d=>allp.filter(x=>x.date===d);
-   const valOf=(a)=>a.reduce((t,x)=>t+Number(x.valeur||0),0);
-   const latest=last? snap(last):[],prior=prev?snap(prev):[];
+   const latest=last?snap(last):[],prior=prev?snap(prev):[];
    const cashLabels=/^(EUR|CASH|ESPECES|ESPÈCES|LIQUIDITÉS|LIQUIDITES)$/i;
    const isCash=x=>cashLabels.test(String(x.libelle||"").trim());
-   const portfolio=valOf(latest.filter(x=>!isCash(x))),cashPos=valOf(latest.filter(isCash));
-   const accountVal=currentAccountValue(c,dstr(now));
-   let cash=cashPos;
-   if(/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""))){cash=Math.max(0,cashPos||accountVal-portfolio)}
-   else if(cashPos===0)cash=0;
-   const current=portfolio+cash || accountVal;
-   const previous=prev?valOf(prior):null;
+   const cashPos=latest.filter(isCash).reduce((a,x)=>a+Number(x.valeur||0),0);
+   const rawTotal=latest.find(x=>/^total$/i.test(String(x.libelle||"")));
+   const current=latest.length?positionValue(latest):currentAccountValue(c,dstr(now));
+   const portfolio=rawTotal?Math.max(0,Number(rawTotal.valeur||0)-cashPos):latest.filter(x=>!isCash(x)&&!NON_ASSET_LABEL.test(String(x.libelle||""))).reduce((a,x)=>a+Number(x.valeur||0),0);
+   const cash=cashPos || (/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""))?Math.max(0,current-portfolio):0);
+   const previous=prev?positionValue(prior):null;
    const change=previous==null?null:current-previous;
    const tx=await all(()=>SB.from("transactions").select("date,montant,libelle").eq("compte_id",c.id).gte("date",prev||last||"1900-01-01").lte("date",last||dstr(now)));
    const netFlows=tx.reduce((a,x)=>a+Number(x.montant||0),0);
    const performance=previous==null?null:(current-previous-netFlows);
    total+=current;if(change!=null)delta+=change;if(performance!=null)perf+=performance;
    const isTR=/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""));
-   out.push(`<div class="card" style="cursor:default"><h3>${esc(c.nom)}</h3><div class="kgrid"><div class="kpi"><div class="l">${isTR?"Portefeuille titres":"Valorisation"}</div><div class="v">${money(isTR?portfolio:current-cash)}</div></div>${isTR?`<div class="kpi"><div class="l">Espèces</div><div class="v">${money(cash)}</div></div>`:""}<div class="kpi"><div class="l">Total</div><div class="v">${money(current)}</div></div><div class="kpi"><div class="l">Variation observée</div><div class="v">${change==null?"Historique insuffisant":money(change)}</div></div><div class="kpi"><div class="l">Performance estimée</div><div class="v">${performance==null?"Historique insuffisant":money(performance)}</div></div></div><p class="mu">Dernière valorisation : ${last||"aucune position importée"}${prev?" · comparaison avec "+prev:""}${isTR&&!latest.length?" · portefeuille titres non importé : le solde est présenté provisoirement en espèces.":""}</p></div>`);
+   const hist=dates.slice(-18).reverse().map(d=>{
+    const batch=snap(d),sum=positionValue(batch);
+    return `<tr><td>${d.split("-").reverse().join("/")}</td><td>${batch.map(x=>esc(x.libelle)+" : "+money(x.valeur)).join("<br>")}</td><td>${money(sum)}</td></tr>`;
+   }).join("");
+   out.push(`<div class="card" style="cursor:default"><h3>${esc(c.nom)}</h3><div class="kgrid"><div class="kpi"><div class="l">${isTR?"Portefeuille titres":"Valorisation"}</div><div class="v">${money(isTR?portfolio:current-cash)}</div></div>${isTR?`<div class="kpi"><div class="l">Espèces</div><div class="v">${money(cash)}</div></div>`:""}<div class="kpi"><div class="l">Total</div><div class="v">${money(current)}</div></div><div class="kpi"><div class="l">Variation observée</div><div class="v">${change==null?"Historique insuffisant":money(change)}</div></div><div class="kpi"><div class="l">Performance estimée</div><div class="v">${performance==null?"Historique insuffisant":money(performance)}</div></div></div><p class="mu">Dernière valorisation : ${last||"aucune position importée"}${prev?" · comparaison avec "+prev:""}${isTR&&!latest.length?" · portefeuille titres non importé : le solde est présenté provisoirement en espèces.":""}</p>${hist?`<details><summary class="mu" style="cursor:pointer">Voir l’historique des valorisations (${dates.length} relevés)</summary><div style="overflow-x:auto;margin-top:8px"><table class="am2"><tr><th>Date</th><th>Détail des actifs / indicateurs</th><th>Valeur du portefeuille</th></tr>${hist}</table></div></details>`:""}</div>`);
   }
   $("invtotal").textContent=money(total);$("invchange").textContent=money(delta);$("invperf").textContent=money(perf);
   $("investmentRows").innerHTML=out.join("")||'<p class="mu">Aucun compte de placement reconnu. Importez les valorisations depuis l’onglet Import.</p>';
+  await renderDcaCrypto();
  }catch(e){toast("Placements : "+e.message)}
 }
+function fillDcaAccounts(){
+ const sel=$("dcaAccount");if(!sel)return;const old=sel.value;
+ const list=CPT.filter(c=>c.famille==="Comptes courants");
+ sel.innerHTML=list.map(c=>`<option value="${esc(c.id)}">${esc(c.nom)}</option>`).join("");
+ if(old&&list.some(c=>c.id===old))sel.value=old;else{const pierre=list.find(c=>/^pierre$/i.test(c.nom));if(pierre)sel.value=pierre.id;}
+ if(!list.length)sel.innerHTML='<option value="">Aucun compte courant</option>';
+}
+async function renderDcaCrypto(){
+ fillDcaAccounts();
+ if($("dcaDate")&&!$("dcaDate").value)$("dcaDate").value=dstr(now);
+ const account=$("dcaAccount")&&$("dcaAccount").value;
+ const q=SB.from("transactions").select("id,date,libelle,montant,note,compte_id").eq("categorie","Placements").eq("sous_categorie","DCA-Crypto").order("date",{ascending:false}).limit(300);
+ const {data,error}=await q;if(error)throw error;
+ const list=data||[];let btc=0,invested=0;
+ for(const x of list){const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i);if(m)btc+=num2(m[1]);invested+=Math.abs(Number(x.montant||0));}
+ $("dcaSummary").innerHTML=`<div class="kgrid"><div class="kpi"><div class="l">Total investi enregistré</div><div class="v">${money(invested)}</div></div><div class="kpi"><div class="l">BTC renseignés dans les achats</div><div class="v">${btc.toLocaleString("fr-FR",{maximumFractionDigits:8})} BTC</div></div></div>`;
+ $("dcaHistory").innerHTML=list.length?`<h3 style="margin:14px 0 4px">Historique des achats</h3><div style="overflow-x:auto"><table class="am2"><tr><th>Date</th><th>Compte / libellé</th><th>Quantité BTC</th><th>Prix BTC</th><th>Montant</th></tr>${list.map(x=>{const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i),p=String(x.note||"").match(/PRIX\s*=\s*([0-9.,]+)/i);return `<tr><td>${x.date.split("-").reverse().join("/")}</td><td>${esc(CN(x.compte_id)||"")} · ${esc(x.libelle)}</td><td>${m?num2(m[1]).toLocaleString("fr-FR",{maximumFractionDigits:8}):"—"}</td><td>${p?money(num2(p[1])):"—"}</td><td>${money(Math.abs(Number(x.montant||0)))}</td></tr>`}).join("")}</table></div>`:'<p class="mu">Aucun achat DCA-Crypto enregistré pour le moment.</p>';
+}
+$("dcaSave").onclick=async()=>{
+ const account=$("dcaAccount").value,date=$("dcaDate").value,amount=Number($("dcaAmount").value),qty=Number(String($("dcaQty").value).replace(",",".")),price=Number(String($("dcaPrice").value).replace(",","."));
+ if(!account||!date||!Number.isFinite(amount)||amount<=0){toast("Compte, date et montant positif requis");return}
+ if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<=0){toast("Renseigne une quantité BTC et un prix unitaire positifs");return}
+ const label="Achat DCA-Crypto BTC";
+ const key="DCA-CRYPTO|"+account+"|"+date+"|"+amount.toFixed(2)+"|"+qty.toFixed(8)+"|"+price.toFixed(2);
+ const note=`DCA-Crypto | BTC=${qty.toFixed(8)} | PRIX=${price.toFixed(2)} EUR`;
+ const {error}=await SB.from("transactions").insert({date,libelle:label,montant:-Math.round(amount*100)/100,note,categorie:"Placements",sous_categorie:"DCA-Crypto",statut_cat:"manuelle",compte_id:account,cle_doublon:KPc(account)+key});
+ if(error){toast("Erreur : "+error.message);return}
+ $("dcaAmount").value="";$("dcaQty").value="";$("dcaPrice").value="";
+ await renderDcaCrypto();toast("Achat DCA-Crypto enregistré");
+};
 async function loadProperties(){
  try{
   await ensureFinanceData();
