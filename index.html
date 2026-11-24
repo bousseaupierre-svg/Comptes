@@ -83,7 +83,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 .ownerrow{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--ln)}
 .ownerrow select{margin:0;padding:8px;font-size:14px}
 .mini-bar{height:8px;background:var(--ln);border-radius:6px;overflow:hidden;margin:5px 0 10px}.mini-bar i{display:block;height:100%;background:var(--ok)}
-.pillnote{display:inline-block;border:1px solid var(--ln);border-radius:20px;padding:3px 8px;font-size:11px;color:var(--mu)}
+.choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.choice-grid label{display:flex;align-items:center;gap:6px;font-size:12px;margin:0}.chart-bars{display:flex;align-items:flex-end;gap:8px;height:150px;padding:8px 2px 0;border-bottom:1px solid var(--ln)}.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}.chart-stack{display:flex;align-items:flex-end;gap:3px;height:120px;width:100%;justify-content:center}.chart-bar{width:38%;min-width:5px;border-radius:4px 4px 0 0}.chart-label{font-size:10px;color:var(--mu);margin-top:5px}.chart-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;margin-top:10px}.chart-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}.fix-group{cursor:pointer}.fix-detail[hidden]{display:none}.pillnote{display:inline-block;border:1px solid var(--ln);border-radius:20px;padding:3px 8px;font-size:11px;color:var(--mu)}
 @media(min-width:520px){.kgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
@@ -96,7 +96,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="go">Se connecter</button><p class="mu" id="lm"></p>
 </section>
 <section id="ap" hidden>
- <div class="tabs"><button id="t9">Tableau de bord</button><button id="t10">Patrimoine</button><button id="t11">Placements</button><button id="t12">Immobiliers</button><button id="t1" class="on">Opérations</button><button id="t6">Prêts</button><button id="t8">Impôts</button><button id="t5">Analyse</button><button id="t4">Fixes</button><button id="t2">Import</button><button id="t7">Paramètres</button><button id="t3">Quitter</button></div>
+ <div class="tabs"><button id="t9">Tableau de bord</button><button id="t11">Placements</button><button id="t1" class="on">Opérations</button><button id="t6">Prêts</button><button id="t8">Impôts</button><button id="t12">Immobiliers</button><button id="t10">Patrimoine</button><button id="t5">Analyse</button><button id="t4">Fixes</button><button id="t2">Import</button><button id="t7">Paramètres</button><button id="t3">Quitter</button></div>
  <div id="v1">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
   <ul id="ca"></ul><div id="park" hidden><div id="txb">
@@ -134,18 +134,17 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   </div>
   <div id="an2" hidden>
    <div class="nav"><button id="zp" aria-label="Année précédente">‹</button><h2 id="zy" style="font-size:16px"></h2><button id="zn" aria-label="Année suivante">›</button></div>
-   <select id="zm"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select>
+   <select id="zm"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select><div class="card" style="cursor:default;margin:10px 0"><b>Catégories à afficher dans le graphique</b><div id="catChartChoices" class="choice-grid"></div></div>
    <div id="zc" style="margin-top:10px"></div><div id="zl" class="mu" style="margin:4px 0 10px"></div>
    <div style="overflow-x:auto"><table class="am2" id="zt"></table></div>
    <p class="mu">Comptes courants, 12 mois glissants. Charges en négatif, dépenses en positif, comme l’onglet d’analyse de l’Excel.</p>
   </div>
  </div>
  <div id="v7" hidden>
-  <h2>Paramètres</h2>
-  <h3 style="margin:14px 0 4px">Catégories et sous-catégories</h3><p class="mu">Appuyez sur une catégorie pour gérer ses sous-catégories.</p>
-  <button class="btn" id="ca1">+ Nouvelle catégorie</button><ul id="cl"></ul>
-  <h3 style="margin:24px 0 4px">Règles d’affectation automatique</h3><p class="mu">Si le libellé contient le mot-clé, la ligne reçoit cette catégorie (le mot-clé le plus long l’emporte).</p>
-  <input id="rf" placeholder="Rechercher une règle"><button class="btn" id="ra">+ Nouvelle règle</button><button class="btn alt" id="rap">Appliquer les règles aux lignes à compléter</button><ul id="rl"></ul>
+  <h2>Paramètres</h2><div class="subs"><button id="st1" class="on">Catégories</button><button id="st2">Règles</button><button id="st3">Attribution des comptes</button></div>
+  <div id="sv1"><h3 style="margin:14px 0 4px">Catégories et sous-catégories</h3><p class="mu">Appuyez sur une catégorie pour gérer ses sous-catégories.</p><button class="btn" id="ca1">+ Nouvelle catégorie</button><ul id="cl"></ul></div>
+  <div id="sv2" hidden><h3 style="margin:14px 0 4px">Règles d’affectation automatique</h3><p class="mu">Si le libellé contient le mot-clé, la ligne reçoit cette catégorie (le mot-clé le plus long l’emporte).</p><input id="rf" placeholder="Rechercher une règle"><button class="btn" id="ra">+ Nouvelle règle</button><button class="btn alt" id="rap">Appliquer les règles aux lignes à compléter</button><ul id="rl"></ul></div>
+  <div id="sv3" hidden><h3 style="margin:14px 0 4px">Attribution des comptes</h3><p class="mu">Choisis à qui appartient chaque compte. Les modifications sont conservées sur cet appareil.</p><div id="ownerRules"></div></div>
  </div>
  <div id="v8" hidden>
   <h2>Impôts</h2>
@@ -159,17 +158,14 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
    <div class="kpi"><div class="l">Reste à payer</div><div class="v" id="dashrest">—</div><div class="l">Charges non pointées du mois</div></div>
    <div class="kpi"><div class="l">Retards</div><div class="v" id="dashlate">—</div><div class="l">Charges échues non réglées</div></div>
    <div class="kpi"><div class="l">Lignes à compléter</div><div class="v" id="dashtodo">—</div><div class="l">Opérations sans catégorie</div></div>
-   <div class="kpi"><div class="l">Taux d’épargne</div><div class="v" id="dashrate">—</div><div class="l">Épargne estimée / revenus</div></div>
-   <div class="kpi"><div class="l">Versements programmés</div><div class="v">505 €/mois</div><div class="l">Moyenne retenue selon nos échanges</div></div>
+   <div class="kpi" id="rateKpi"><div class="l">Taux d’épargne</div><div class="v" id="dashrate">—</div><div class="l">Épargne estimée / revenus</div><button class="btn alt" id="rateDetailBtn" style="margin-top:8px">Voir le détail</button></div>
   </div>
-  <h3 class="section-title">Versements programmés</h3>
-  <div class="card" style="cursor:default"><table class="am2"><tr><td>Assurance-vie Pierre</td><td>200 €/mois</td></tr><tr><td>Assurance-vie Marion (PONY)</td><td>200 €/mois</td></tr><tr><td>Trade Republic</td><td>105 €/mois</td></tr><tr><td>Kraken</td><td>30 €/semaine</td></tr></table><p class="mu">La moyenne mensuelle de 505 € est conservée telle que définie ensemble.</p></div>
-  <p class="mu">La synthèse n’affiche pas de prévision de trésorerie ni de prochaines échéances.</p>
+  <div class="card" style="cursor:default;margin-top:14px"><h3>Évolution mensuelle</h3><div id="dashMonthlyChart"></div></div><div class="card" style="cursor:default;margin-top:12px"><h3>Répartition des dépenses</h3><div id="dashCategoryChart"></div></div><div class="card" id="rateDetails" hidden style="cursor:default;margin-top:12px"><h3>Détail du taux d’épargne</h3><div id="rateDetailsContent"></div></div><p class="mu">La synthèse n’affiche pas de prévision de trésorerie ni de prochaines échéances.</p>
  </div>
  <div id="v10" hidden>
   <h2>Patrimoine</h2><div class="big" id="networth">—</div><div class="mu">Patrimoine net estimé : actifs financiers et immobiliers moins capitaux restant dus.</div>
   <h3 class="section-title">Répartition par titulaire</h3><div id="ownerTotals"></div>
-  <h3 class="section-title">Attribution des comptes</h3><p class="mu">Les règles sont préremplies selon nos échanges. Tu peux les ajuster ici ; elles sont conservées sur cet appareil.</p><div id="ownerRules"></div>
+  
   <h3 class="section-title">Historique du patrimoine</h3><div id="wealthHistory"></div>
   <p class="mu">L’historique est recalculé à partir des soldes, positions et tableaux d’amortissement disponibles. Les valeurs immobilières restent aux dernières estimations saisies. Pour le PTZ et La Bernerie, faute d’historique d’amortissement complet, le dernier capital connu est maintenu constant dans les mois antérieurs.</p>
  </div>
@@ -353,7 +349,9 @@ $("cpf").onchange=()=>loadView();
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}renderCa();loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
 function tab(n){[1,2,4,5,6,7,8,9,10,11,12].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;if($("t"+v))$("t"+v).classList.toggle("on",v===n)})}
-$("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=()=>{tab(7);renderCat()};$("t8").onclick=()=>{tab(8);loadImp()};
+$("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=()=>{tab(7);renderCat();renderOwnerSettings()};$("t8").onclick=()=>{tab(8);loadImp()};
+$("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};
+function settingsSub(n){[1,2,3].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).classList.toggle("on",i===n)})}
 $("t9").onclick=()=>{tab(9);loadDashboard()};
 $("t10").onclick=()=>{tab(10);loadWealth()};
 $("t11").onclick=()=>{tab(11);loadInvestments()};
@@ -425,9 +423,9 @@ function renderCF(){const t=new Date();t.setHours(0,0,0,0);let due=0,paid=0,rest
  for(const x of FO){const p=x.p,e=Number(x.c.montant),cid=x.c.compte_id||"",g=G[cid]=G[cid]||{h:"",rest:0};
   if(e<0){if(p){paid-=p.a;due-=p.a}else{rest-=e;due-=e;g.rest-=e}}else{if(p){got+=p.a;inc+=p.a}else inc+=e}
   const late=!p&&x.dt<t,st=p?"Passée le "+new Date(p.d+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+(p.auto?" · relevé":""):late?"En retard":"À venir";
-  g.h+=`<li class="f ${p?"ok":late?"late":""}" data-k="${x.k}"><div class="dy"><b>${x.dt.getDate()}</b>${WD[x.dt.getDay()]}</div><div class="lb"><span>${x.c.libelle}</span><small>${st}</small></div><div class="am">${(x.c.variable&&!p?"≈ ":"")+eur(p?p.a:e)}</div><button class="ck" aria-label="Pointer">✓</button></li>`}
+  g.h+=`<li class="f fix-detail ${p?"ok":late?"late":""}" data-group-item="${cid}" data-k="${x.k}" hidden><div class="dy"><b>${x.dt.getDate()}</b>${WD[x.dt.getDay()]}</div><div class="lb"><span>${x.c.libelle}</span><small>${st}</small></div><div class="am">${(x.c.variable&&!p?"≈ ":"")+eur(p?p.a:e)}</div><button class="ck" aria-label="Pointer">✓</button></li>`}
  let h="";const ids=Object.keys(G).sort((a,b)=>(CPT.findIndex(c=>c.id===a)+1||99)-(CPT.findIndex(c=>c.id===b)+1||99));
- for(const id of ids)h+=`<li class="gh" style="font-size:18px"><span>${id?(CN(id)||"Compte"):"Sans compte"}</span><span>${eur(G[id].rest)}</span></li>`+G[id].h;
+ for(const id of ids)h+=`<li class="gh fix-group" data-toggle-group="${id}" style="font-size:18px"><span>＋ ${id?(CN(id)||"Compte"):"Sans compte"}</span><span>${eur(G[id].rest)}</span></li>`+G[id].h;
  $("fl").innerHTML=h;$("fm").textContent=MO[FM.m][0].toUpperCase()+MO[FM.m].slice(1)+" "+FM.y;
  $("fr").textContent=eur(rest);$("fg").style.width=(due?Math.min(100,paid/due*100):0)+"%";
  $("fs").textContent="Payé "+eur(paid)+" sur "+eur(due)+" · Revenus "+eur(got)+" sur "+eur(inc)}
@@ -439,14 +437,14 @@ $("fxv").onclick=async()=>{const u={auto:false,montant:parseFloat($("fxa").value
  const r=await SB.from("charges_fixes").update(u).eq("id",FX.id);if(r.error){toast("Erreur : "+r.error.message);return}$("fxd").close();loadCF()};
 $("fxr").onclick=async()=>{const r=await SB.from("charges_fixes").update({ignore:true,actif:false}).eq("id",FX.id);
  if(r.error){toast("Erreur : "+r.error.message+" (avez-vous lancé le script SQL de mise à jour ?)");return}$("fxd").close();toast("Charge retirée");loadCF()};
-$("fl").addEventListener("click",async ev=>{const li=ev.target.closest("li");if(!li||!li.dataset.k)return;const x=FO.find(z=>z.k===li.dataset.k);
+$("fl").addEventListener("click",async ev=>{const group=ev.target.closest("[data-toggle-group]");if(group){const id=group.dataset.toggleGroup,open=group.dataset.open!=="1";group.dataset.open=open?"1":"0";group.querySelector("span").textContent=(open?"－ ":"＋ ")+(id?(CN(id)||"Compte"):"Sans compte");$("fl").querySelectorAll(`[data-group-item="${id}"]`).forEach(x=>x.hidden=!open);return}const li=ev.target.closest("li");if(!li||!li.dataset.k)return;const x=FO.find(z=>z.k===li.dataset.k);
  if(!ev.target.closest(".ck")){FX=x.c;$("fxt").textContent=x.c.libelle;$("fxa").value=x.c.montant;$("fxj").value=x.c.jour??"";$("fxl").hidden=x.c.jour_semaine!=null;$("fxc2").innerHTML=CPT.filter(c=>c.famille==="Comptes courants").map(c=>`<option value="${c.id}">${c.nom}</option>`).join("");$("fxc2").value=x.c.compte_id||"";$("fxd").showModal();return}
  if(x.p&&x.p.auto){toast("Pointée automatiquement d’après le relevé");return}
  const r=x.p?await SB.from("pointages").delete().eq("cle",x.k):await SB.from("pointages").insert({cle:x.k,montant:x.c.montant,date:dstr(x.dt)});
  if(r.error){toast("Erreur : "+r.error.message);return}loadCF()});
 $("fp").onclick=()=>{FM.m--;if(FM.m<0){FM.m=11;FM.y--}loadCF()};
 $("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
-let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={},AS=1,ZE={y:now.getFullYear(),m:now.getMonth()},ZX=null,ZMODE=1,TXB=null;
+let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={},AS=1,ZE={y:now.getFullYear(),m:now.getMonth()},ZX=null,ZMODE=1,TXB=null,CAT_CHART_SELECTED=null;
 const FROM="2026-01-01";
 const ymEnd=(y,m)=>ymd(y,m,new Date(y,m+1,0).getDate());
 async function loadTxAll(){const r=await all(()=>SB.from("transactions").select("compte_id,date,montant").order("id")),by={};
@@ -518,13 +516,15 @@ function renderCatAn(){
  const row=(l,a,em)=>"<tr><td>"+l+"</td>"+K.map(k=>"<td>"+(em?"":f2(a[k]))+"</td>").join("")+"</tr>";
  const fut=(w)=>w.y>now.getFullYear()||(w.y===now.getFullYear()&&w.m>now.getMonth());
  $("zt").innerHTML="<tr>"+H.map(x=>"<th>"+x+"</th>").join("")+"</tr>"+W.map((w,i)=>row(MO[w.m].slice(0,4)+". "+String(w.y).slice(2),Z[i],fut(w))).join("")+row("Total",T,false).replace("<tr>",'<tr class="cur">');
- const segs=Z.map(a=>[Math.max(-a.fx,0),Math.max(a.dep,0),Math.max(a.loi,0),Math.max(a.exc,0),Math.max(a.vac,0)]),mx=Math.max(1,...segs.map(s=>s.reduce((x,y)=>x+y,0)));
- const col=["#0f4c5c","#2f9e8f","#e0a526","#c2412b","#7a5cc2"],nm=["Fixe payé","Dépense","Loisir","Exceptionnelle","Vacances"];
+ const categoryDefs=[{key:"fx",name:"Fixe payé"},{key:"dep",name:"Dépense"},{key:"loi",name:"Loisir"},{key:"exc",name:"Exceptionnelle"},{key:"vac",name:"Vacances"},{key:"bar",name:"Bar"},{key:"res",name:"Restaurant"}];
+ if(CAT_CHART_SELECTED===null)CAT_CHART_SELECTED=categoryDefs.map(x=>x.key);
+ const choices=$("catChartChoices");choices.innerHTML=categoryDefs.map(x=>`<label><input type="checkbox" data-cat-chart="${x.key}" ${CAT_CHART_SELECTED.includes(x.key)?"checked":""}>${x.name}</label>`).join("");
+ choices.querySelectorAll("input[data-cat-chart]").forEach(el=>el.onchange=()=>{const k=el.dataset.catChart;CAT_CHART_SELECTED=el.checked?[...CAT_CHART_SELECTED,k]:CAT_CHART_SELECTED.filter(x=>x!==k);renderCatAn()});
+ const chosen=categoryDefs.filter(x=>CAT_CHART_SELECTED.includes(x.key)),colors=["#0f4c5c","#2f9e8f","#e0a526","#c2412b","#7a5cc2","#3b82a0","#82945b"];
+ const segs=Z.map(a=>chosen.map(x=>Math.max(0,x.key==="fx"?-a.fx:x.key==="bar"?a.bar:x.key==="res"?a.res:a[x.key]))),mx=Math.max(1,...segs.map(s=>s.reduce((x,y)=>x+y,0)));
  let svg=`<svg viewBox="0 0 360 200" width="100%" role="img" aria-label="Dépenses par catégorie et par mois"><text x="2" y="12" font-size="9" fill="currentColor">${eur(mx)}</text><line x1="0" y1="170" x2="360" y2="170" stroke="currentColor" stroke-opacity=".25"/>`;
- segs.forEach((sg,i)=>{let y=170;const x=10+i*29;sg.forEach((v,j)=>{const h=v/mx*148;y-=h;if(h>0.3)svg+=`<rect x="${x}" y="${y.toFixed(1)}" width="21" height="${h.toFixed(1)}" fill="${col[j]}"/>`});
-  svg+=`<text x="${x+10.5}" y="184" font-size="8" text-anchor="middle" fill="currentColor">${MO[W[i].m].slice(0,3)}</text>`});
- svg+="</svg>";
- $("zc").innerHTML=svg;$("zl").innerHTML=nm.map((n,j)=>`<span style="display:inline-block;margin-right:10px"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${col[j]};margin-right:4px"></i>${n}</span>`).join("");
+ segs.forEach((sg,i)=>{let y=170;const x=10+i*29;sg.forEach((v,j)=>{const h=v/mx*148;y-=h;if(h>0.3)svg+=`<rect x="${x}" y="${y.toFixed(1)}" width="21" height="${h.toFixed(1)}" fill="${colors[categoryDefs.findIndex(q=>q.key===chosen[j].key)]}"/>`});svg+=`<text x="${x+10.5}" y="184" font-size="8" text-anchor="middle" fill="currentColor">${MO[W[i].m].slice(0,3)}</text>`});svg+="</svg>";
+ $("zc").innerHTML=svg;$("zl").innerHTML=chosen.map(x=>`<span style="display:inline-block;margin-right:10px"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${colors[categoryDefs.findIndex(q=>q.key===x.key)]};margin-right:4px"></i>${x.name}</span>`).join("");
  $("zy").textContent=MO[W[0].m].slice(0,4)+". "+W[0].y+" – "+MO[W[11].m].slice(0,4)+". "+W[11].y}
 $("zp").onclick=()=>{ZE.y--;loadCatAn()};$("zn").onclick=()=>{ZE.y++;loadCatAn()};$("zm").onchange=()=>{ZMODE=+$("zm").value;loadCatAn()};
 $("as1").onclick=()=>{AS=1;$("an1").hidden=false;$("an2").hidden=true;$("as1").classList.add("on");$("as2").classList.remove("on");loadAn()};
@@ -745,7 +745,7 @@ $("go").onclick=async()=>{$("lm").textContent="";
 async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}refreshCrypto().then(()=>loadSo().then(renderCa)).catch(()=>{});loadView()}
 let CAT=[],SOA=[],COPEN={},RD=null;
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
-const opts=a=>a.map(s=>`<option value="${esc(s)}">`).join("");
+const opts=a=>a.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
 let CATNAMES=[];
 const fillSel=(el,list,v)=>{const a=[...list];if(v&&!a.includes(v))a.push(v);el.innerHTML='<option value="">—</option>'+opts(a);el.value=v||""};
 function subsFor(c){return [...new Set(CAT.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))].sort((a,b)=>a.localeCompare(b,"fr"))}
@@ -756,7 +756,7 @@ async function syncCat(){
   REF.forEach(r=>add(r.categorie,r.sous_categorie));RULES.forEach(r=>add(r.categorie,r.sous_categorie));
   if(miss.size){const rows=[...miss.values()];for(let i=0;i<rows.length;i+=300){const{error}=await SB.from("categories").upsert(rows.slice(i,i+300),{onConflict:"categorie,sous_categorie"});if(error)throw error}CAT=CAT.concat(rows)}}
  catch(e){CAT=[]}
- const names=[...new Set([...CAT.map(c=>c.categorie),...REF.map(r=>r.categorie).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"fr"));
+ const fallback=["Fixe","Revenu","Dépense","Loisir","Vacances","Exceptionnel","Transfert","Investissement"];const names=[...new Set([...CAT.map(c=>c.categorie),...REF.map(r=>r.categorie).filter(Boolean),...RULES.map(r=>r.categorie).filter(Boolean),...fallback])].sort((a,b)=>a.localeCompare(b,"fr"));
  CATNAMES=names;fillSel($("sc"),names,$("sc").value);fillSel($("rdc"),names,$("rdc").value)}
 function renderCat(){
  const cn={},rn={},inc=(o,k)=>{o[k]=(o[k]||0)+1};
@@ -942,18 +942,31 @@ async function loadDashboard(){
   const tx=await all(()=>SB.from("transactions").select("id,date,libelle,montant,categorie,sous_categorie,statut_cat,compte_id").gte("date",start).lt("date",end).order("date"));
   const income=tx.filter(x=>Number(x.montant)>0).reduce((a,x)=>a+Number(x.montant),0);
   const investRx=/PONY|ASSURANCE.?VIE|TRADE.?REPUBLIC|KRAKEN|PEA|VERSEMENT/i;
-  const expenses=tx.filter(x=>Number(x.montant)<0&&!investRx.test(x.libelle||"")).reduce((a,x)=>a+Number(x.montant),0);
-  const net=income+expenses;
-  const rate=income>0?net/income*100:0;
-  await loadCF();
-  const today=new Date();today.setHours(0,0,0,0);
-  const pending=FO.filter(x=>Number(x.c.montant)<0&&!x.p);
-  const late=pending.filter(x=>x.dt<today);
+  const expenses=tx.filter(x=>Number(x.montant)<0&&!investRx.test(x.libelle||"")).reduce((a,x)=>a+Math.abs(Number(x.montant)),0);
+  const net=income-expenses,rate=income>0?net/income*100:0;
+  await loadCF();const today=new Date();today.setHours(0,0,0,0);
+  const pending=FO.filter(x=>Number(x.c.montant)<0&&!x.p),late=pending.filter(x=>x.dt<today);
   const todo=tx.filter(x=>x.statut_cat==="a_completer").length;
   $("dashperiod").textContent=MO[now.getMonth()][0].toUpperCase()+MO[now.getMonth()].slice(1)+" "+now.getFullYear();
   $("dashnet").textContent=money(net);$("dashrest").textContent=money(pending.reduce((a,x)=>a+Math.abs(Number(x.c.montant)),0));
   $("dashlate").textContent=late.length+" charge(s)";$("dashtodo").textContent=String(todo);$("dashrate").textContent=rate.toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
+  $("rateDetailsContent").innerHTML=`<div class="pitem"><span>Revenus du mois</span><b>${money(income)}</b></div><div class="pitem"><span>Dépenses hors placements</span><b>${money(expenses)}</b></div><div class="pitem"><span>Épargne estimée</span><b>${money(net)}</b></div><p class="mu">Calcul : (revenus − dépenses hors placements) ÷ revenus × 100. Les virements identifiés vers les placements sont exclus.</p>`;
+  $("rateDetailBtn").onclick=()=>{$("rateDetails").hidden=!$("rateDetails").hidden};
+  const sixStart=ymd(now.getFullYear(),now.getMonth()-5,1),sixEnd=ymd(now.getFullYear(),now.getMonth()+1,1);
+  const hist=await all(()=>SB.from("transactions").select("date,libelle,montant,categorie").gte("date",sixStart).lt("date",sixEnd));
+  const months=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1),key=d.getFullYear()+"-"+pad(d.getMonth()+1),rs=hist.filter(x=>x.date.slice(0,7)===key);months.push({label:MO[d.getMonth()].slice(0,3),inc:rs.filter(x=>+x.montant>0).reduce((a,x)=>a+ +x.montant,0),out:rs.filter(x=>+x.montant<0&&!investRx.test(x.libelle||"")).reduce((a,x)=>a+Math.abs(+x.montant),0)})}
+  const mx=Math.max(1,...months.flatMap(x=>[x.inc,x.out]));
+  $("dashMonthlyChart").innerHTML='<div class="chart-bars">'+months.map(m=>`<div class="chart-col"><div class="chart-stack"><i class="chart-bar" title="Revenus ${money(m.inc)}" style="height:${m.inc/mx*112}px;background:#2f9e8f"></i><i class="chart-bar" title="Dépenses ${money(m.out)}" style="height:${m.out/mx*112}px;background:#d97757"></i></div><span class="chart-label">${m.label}</span></div>`).join("")+'</div><div class="chart-legend"><span><i class="chart-dot" style="background:#2f9e8f"></i>Revenus</span><span><i class="chart-dot" style="background:#d97757"></i>Dépenses</span></div>';
+  const by={};tx.filter(x=>+x.montant<0&&!investRx.test(x.libelle||"")).forEach(x=>{const k=x.categorie||"À catégoriser";by[k]=(by[k]||0)+Math.abs(+x.montant)});
+  const cats=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,6),cm=Math.max(1,...cats.map(x=>x[1]));
+  $("dashCategoryChart").innerHTML=cats.length?cats.map(([k,v],i)=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(k)}</span><b>${money(v)}</b></div><div class="mini-bar"><i style="width:${v/cm*100}%;background:${["#2f9e8f","#d97757","#e0a526","#7a5cc2","#3b82a0","#82945b"][i]}"></i></div></div>`).join(""):'<p class="mu">Aucune dépense enregistrée ce mois-ci.</p>';
  }catch(e){toast("Tableau de bord : "+e.message)}
+}
+function renderOwnerSettings(){
+ const host=$("ownerRules");if(!host)return;
+ const list=CPT.map(c=>`<div class="ownerrow"><span>${esc(c.nom)} <small class="mu">· ${esc(c.famille||"Compte")}</small></span><select data-owner="${esc(c.id)}">${OWNERS.map(o=>`<option value="${o}" ${ownFor(c)===o?"selected":""}>${o}</option>`).join("")}</select></div>`).join("");
+ host.innerHTML=list||'<p class="mu">Aucun compte chargé.</p>';
+ host.querySelectorAll("select[data-owner]").forEach(el=>el.onchange=()=>{ownerSet({id:el.dataset.owner},el.value)});
 }
 async function loadWealth(){
  try{
@@ -967,9 +980,6 @@ async function loadWealth(){
   const total=Object.values(accounts).reduce((a,b)=>a+b,0);
   $("networth").textContent=money(total);
   $("ownerTotals").innerHTML=OWNERS.map(o=>{const v=accounts[o]||0,pct=total?Math.round(v/total*1000)/10:0;return `<div class="pitem" style="cursor:default"><div><b>${o}</b><div class="sub">${pct.toLocaleString("fr-FR",{maximumFractionDigits:1})} % du patrimoine net</div></div><div class="right">${money(v)}</div></div>`}).join("");
-  const list=CPT.map(c=>`<div class="ownerrow"><span>${esc(c.nom)} <small class="mu">· ${esc(c.famille||"Compte")}</small></span><select data-owner="${esc(c.id)}">${OWNERS.map(o=>`<option ${ownFor(c)===o?"selected":""}>${o}</option>`).join("")}</select></div>`).join("");
-  $("ownerRules").innerHTML=list||'<p class="mu">Aucun compte chargé.</p>';
-  $("ownerRules").querySelectorAll("select[data-owner]").forEach(el=>el.onchange=()=>{ownerSet({id:el.dataset.owner},el.value);loadWealth()});
   const hist=[];
   for(let i=11;i>=0;i--){
    const dt=new Date(now.getFullYear(),now.getMonth()-i+1,0),ds=dstr(dt);
