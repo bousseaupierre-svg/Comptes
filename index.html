@@ -148,8 +148,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  </div>
  <div id="v8" hidden>
   <h2>Impôts</h2>
-  <h3 style="margin:14px 0 4px">Dons</h3><p class="mu">Opérations des comptes courants classées « don » (réduction estimée à 66 %).</p><ul id="idn"></ul>
-  <h3 style="margin:20px 0 4px">Girardin et autres réductions</h3><button class="btn alt" id="ig2">+ Ajouter une ligne</button><ul id="ig"></ul>
+  <h3 style="margin:14px 0 4px">Dons</h3><p class="mu">Le taux de réduction et la date de remboursement se règlent pour chaque année. Les dons sont estimés à partir des opérations classées « don ».</p><ul id="idn"></ul>
+  <h3 style="margin:20px 0 4px">Girardin et autres réductions</h3><p class="mu">Suivi des investissements et réductions d’impôt, notamment Girardin.</p><button class="btn alt" id="ig2">+ Ajouter une ligne Girardin / réduction</button><div id="igSummary"></div><ul id="ig"></ul>
  </div>
  <div id="v9" hidden>
   <h2>Tableau de bord</h2><p class="mu" id="dashperiod"></p>
@@ -219,6 +219,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 <dialog id="ird"><h2 id="irt" style="font-size:16px"></h2>
  <label>Année<input id="ira" type="number" inputmode="numeric"></label><label>Libellé<input id="irl"></label>
  <label>Montant investi (€)<input id="iri" type="number" step="0.01" inputmode="decimal"></label><label>Réduction d’impôt (€)<input id="irr" type="number" step="0.01" inputmode="decimal"></label>
+ <label>Date de remboursement (laisser vide si non remboursé)<input id="irdt" type="date"></label>
  <label>Note<input id="irn"></label>
  <button class="btn" id="irv">Enregistrer</button><button class="btn alt" id="irx" style="color:var(--late);border-color:var(--late)">Supprimer</button><button class="btn alt" id="irf">Fermer</button></dialog>
 <div id="toast" role="status"></div>
@@ -364,7 +365,7 @@ $("cpf").onchange=()=>loadView();
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}renderCa();loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
 function tab(n){[1,2,4,5,6,7,8,9,10,11,12].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;if($("t"+v))$("t"+v).classList.toggle("on",v===n)})}
-$("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=()=>{tab(7);renderCat();renderOwnerSettings()};$("t8").onclick=()=>{tab(8);loadImp()};
+$("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=async()=>{tab(7);try{await loadRef();renderCat();renderOwnerSettings()}catch(e){toast("Erreur de chargement des paramètres : "+e.message)}};$("t8").onclick=()=>{tab(8);loadImp()};
 $("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};
 function settingsSub(n){[1,2,3].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).classList.toggle("on",i===n)})}
 $("t9").onclick=()=>{tab(9);loadDashboard()};
@@ -471,6 +472,7 @@ function balC(c,d){let an=null;for(const r of SOA)if(r.numero===ck(c)&&(!an||r.d
  if(an&&TXB&&TXB[c.id])return Math.round((Number(an.solde)+cumTo(c.id,d)-cumTo(c.id,an.date))*100)/100;
  return balK(ck(c),d)}
 async function loadAn(){try{
+ if(!TAX_LOADED)await loadTaxData();
  if(!SOA.length)await loadSo();if(!TXB)await loadTxAll();
  const s=ymd(AY,AMo,1),e=ymd(AMo===11?AY+1:AY,(AMo+1)%12,1);
  const tx=await all(()=>SB.from("transactions").select("compte_id,montant").gte("date",s).lt("date",e).order("id"));
@@ -503,7 +505,13 @@ function renderAn(){
   return {T,h:`<div class="card" data-b="${b.t}"><h3>${b.t}</h3>${tb(T)}`+(AOPEN[b.t]?`<div style="overflow-x:auto;margin-top:8px"><table class="am2"><tr><th>Compte</th><th>Début</th><th>Débit</th><th>Crédit</th><th>Autres</th><th>Fin</th>${pc?"<th>% remb.</th>":""}</tr>${b.rows.map(r=>`<tr><td>${r.n}</td><td>${f(r.s0)}</td><td>${f(r.d)}</td><td>${f(r.c)}</td><td>${f(r.o)}</td><td>${f(r.s1)}</td>${pc?`<td>${r.pct==null?"—":r.pct+" %"}</td>`:""}</tr>`).join("")}</table></div>`:`<p class="mu" style="margin:6px 0 0">Appuyez pour le détail par compte</p>`)+"</div>"}};
  let h="";const G={s0:0,d:0,c:0,o:0,s1:0};
  for(const b of B){const x=card(b);for(const k in G)G[k]+=x.T[k];h+=x.h}
- if(B.length)h+=glob("Situation globale avant prêts",G);
+ // Créances fiscales : elles diminuent à la date de remboursement, compensant l'encaissement bancaire.
+ const tax0=taxReceivableAt(d0),tax1=taxReceivableAt(d1),taxDelta=Math.round((tax1-tax0)*100)/100;
+ if(tax0>0.004||tax1>0.004||Math.abs(taxDelta)>0.004){
+  const tr={n:"Crédits d’impôt à recevoir",s0:tax0,d:Math.min(taxDelta,0),c:Math.max(taxDelta,0),o:0,s1:tax1};
+  const x=card({t:"Réductions d’impôts",rows:[tr]});for(const k in G)G[k]+=x.T[k];h+=x.h;
+ }
+ if(B.length||tax0>0.004||tax1>0.004)h+=glob("Situation globale avant prêts",G);
  if(pr.length){const x=card({t:"Prêts",rows:pr});for(const k in G)G[k]+=x.T[k];h+=x.h}
  if(B.length||pr.length)h+=glob("Situation globale",G);
  else h='<p class="mu">Aucun solde pour ce mois : importez soldes_historique.csv et vos fichiers de comptes.</p>';
@@ -874,32 +882,68 @@ SB.auth.getSession().then(async({data})=>{let l=0;try{l=+(localStorage.getItem("
  if(data.session&&(!l||Date.now()-l<IDLE)){touch();start()}
  else{if(data.session)await SB.auth.signOut();show(false)}});
 
-let IMP=[],DONS=[],IOPEN={},RI=null;
-async function loadImp(){try{
+let IMP=[],DONS=[],IOPEN={},RI=null,TAX_LOADED=false;
+const DON_PREFIX="__DONS__";
+async function loadTaxData(){
  IMP=(await SB.from("impots").select("*").order("annee",{ascending:false})).data||[];
  DONS=await all(()=>fc(SB.from("transactions").select("id,date,libelle,montant,categorie,sous_categorie")).or("sous_categorie.ilike.%don%,categorie.ilike.%don%").lt("montant",0).order("id"));
- renderImp()}catch(e){toast("Erreur : "+e.message)}}
+ TAX_LOADED=true;
+}
+async function loadImp(){try{await loadTaxData();renderImp()}catch(e){toast("Erreur : "+e.message)}}
+const donationMeta=y=>IMP.find(r=>Number(r.annee)===Number(y)&&r.libelle===DON_PREFIX)||null;
+const donationRate=y=>{const r=donationMeta(y),v=r&&r.taux_reduction!=null?Number(r.taux_reduction):66;return Number.isFinite(v)?Math.max(0,Math.min(100,v)):66};
+const donationRefundDate=y=>{const r=donationMeta(y);return r&&r.date_remboursement?r.date_remboursement:null};
+function donationAmountAt(y,cutoff){return DONS.filter(d=>Number(d.date.slice(0,4))===Number(y)&&d.date<=cutoff).reduce((a,d)=>a-Number(d.montant),0)*donationRate(y)/100}
+function taxReceivableAt(cutoff){
+ let total=0;const years=[...new Set(DONS.map(d=>d.date.slice(0,4)))];
+ for(const y of years){const rd=donationRefundDate(y);if(!rd||rd>cutoff)total+=donationAmountAt(y,cutoff)}
+ for(const r of IMP){if(r.libelle===DON_PREFIX)continue;const amount=Number(r.reduction||0),rd=r.date_remboursement||null;if(!rd||rd>cutoff)total+=amount}
+ return Math.round(total*100)/100;
+}
 function renderImp(){
  const by={};DONS.forEach(d=>{const y=d.date.slice(0,4);(by[y]=by[y]||[]).push(d)});let h="";
- for(const y of Object.keys(by).sort().reverse()){const L=by[y],t=L.reduce((a,d)=>a-Number(d.montant),0);
-  h+=`<li data-y="${y}" style="grid-template-columns:1fr auto"><div class="lb"><span>Dons ${y}</span><small>${L.length} opération(s) · réduction estimée à 66 % : ${eur(t*0.66)}</small></div><div class="am">${eur(t)}</div></li>`;
-  if(IOPEN[y])h+=`<li style="display:block;cursor:default"><div style="overflow-x:auto"><table class="am2"><tr><th>Date</th><th>Libellé</th><th>Montant</th></tr>${L.sort((a,b)=>a.date<b.date?-1:1).map(d=>`<tr><td>${d.date.split("-").reverse().join("/")}</td><td>${esc((d.sous_categorie||d.categorie)+" · "+d.libelle).slice(0,70)}</td><td>${eur(-Number(d.montant))}</td></tr>`).join("")}</table></div></li>`}
+ for(const y of Object.keys(by).sort().reverse()){
+  const L=by[y],t=L.reduce((a,d)=>a-Number(d.montant),0),rate=donationRate(y),refund=donationRefundDate(y),meta=donationMeta(y);
+  h+=`<li data-y="${y}" style="display:block;cursor:default"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div class="lb"><span>Dons ${y}</span><small>${L.length} opération(s) · total ${eur(t)} · réduction estimée ${eur(t*rate/100)}</small></div><div class="am">${eur(t*rate/100)}</div></div><div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><label class="mu">Taux de réduction (%)<input type="number" min="0" max="100" step="0.1" value="${rate}" data-don-rate="${y}" style="margin:4px 0"></label><label class="mu">Remboursement prévu / reçu<input type="date" value="${refund||""}" data-don-date="${y}" style="margin:4px 0"></label></div><button type="button" class="btn alt" data-save-don="${y}">Enregistrer le suivi ${y}</button></li>`;
+  if(IOPEN[y])h+=`<li style="display:block;cursor:default"><div style="overflow-x:auto"><table class="am2"><tr><th>Date</th><th>Libellé</th><th>Montant</th></tr>${L.sort((a,b)=>a.date<b.date?-1:1).map(d=>`<tr><td>${d.date.split("-").reverse().join("/")}</td><td>${esc((d.sous_categorie||d.categorie)+" · "+d.libelle).slice(0,70)}</td><td>${eur(-Number(d.montant))}</td></tr>`).join("")}</table></div></li>`
+ }
  $("idn").innerHTML=h||'<p class="mu">Aucune opération classée « don » dans les comptes courants.</p>';
- const gy={};IMP.forEach(r=>(gy[r.annee]=gy[r.annee]||[]).push(r));let g="";
- for(const y of Object.keys(gy).sort().reverse()){const L=gy[y],tr=L.reduce((a,r)=>a+Number(r.reduction||0),0);
-  g+=`<li class="gh" style="font-size:17px"><span>${y}</span><span>${eur(tr)}</span></li>`+L.map(r=>`<li data-i="${r.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${esc(r.libelle)}</span><small>investi ${eur(r.montant_investi||0)}${r.note?" · "+esc(r.note):""}</small></div><div class="am">${eur(r.reduction||0)}</div></li>`).join("")}
- $("ig").innerHTML=g||'<p class="mu">Aucune ligne (lancez migration5.sql ou ajoutez-en une).</p>'}
-$("idn").addEventListener("click",ev=>{const li=ev.target.closest("li[data-y]");if(li){IOPEN[li.dataset.y]=!IOPEN[li.dataset.y];renderImp()}});
+ const gy={};IMP.filter(r=>r.libelle!==DON_PREFIX).forEach(r=>(gy[r.annee]=gy[r.annee]||[]).push(r));let g="",summary="";
+ const allYears=[...new Set([...Object.keys(gy),...Object.keys(by)])].sort().reverse();
+ for(const y of allYears){
+  const L=gy[y]||[],investi=L.reduce((a,r)=>a+Number(r.montant_investi||0),0),other=L.reduce((a,r)=>a+Number(r.reduction||0),0),donTotal=(by[y]||[]).reduce((a,d)=>a-Number(d.montant),0)*donationRate(y)/100,tr=other+donTotal;
+  summary+=`<div class="card" style="cursor:default;margin:10px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${y}</b><span class="mu">${L.length} dispositif(s)${by[y]?" · "+by[y].length+" don(s)":""}</span></div><div class="kgrid" style="margin-top:8px"><div><small class="mu">Total investi hors dons</small><div class="am">${eur(investi)}</div></div><div><small class="mu">Réductions estimées / saisies</small><div class="am">${eur(tr)}</div></div></div><small class="mu">Dons : ${eur(donTotal)} · Autres dispositifs : ${eur(other)}</small></div>`;
+  if(L.length)g+=`<li class="gh" style="font-size:17px"><span>${y} · ${L.length} ligne(s)</span><span>${eur(other)}</span></li>`+L.map(r=>`<li data-i="${r.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${esc(r.libelle)}</span><small>investi ${eur(r.montant_investi||0)} · ${r.date_remboursement?"remboursé le "+r.date_remboursement.split("-").reverse().join("/"):"à recevoir"}${r.note?" · "+esc(r.note):""}</small></div><div style="display:flex;align-items:center;gap:8px"><div class="am">${eur(r.reduction||0)}</div><button type="button" class="okb" data-del-i="${r.id}" aria-label="Supprimer ${esc(r.libelle)}" title="Supprimer" style="color:var(--late);border-color:var(--late)">✕</button></div></li>`).join("");
+ }
+ $("igSummary").innerHTML=summary||"";
+ $("ig").innerHTML=g||'<p class="mu">Aucune ligne. Ajoutez un investissement Girardin ou une autre réduction d’impôt.</p>'
+}
+$("idn").addEventListener("click",async ev=>{
+ const save=ev.target.closest("button[data-save-don]");if(save){const y=Number(save.dataset.saveDon),rateEl=document.querySelector(`[data-don-rate="${y}"]`),dateEl=document.querySelector(`[data-don-date="${y}"]`),rate=Number(rateEl.value);
+  if(!Number.isFinite(rate)||rate<0||rate>100){toast("Le taux doit être compris entre 0 et 100 %");return}
+  const existing=donationMeta(y),v={annee:y,libelle:DON_PREFIX,taux_reduction:rate,date_remboursement:dateEl.value||null,reduction:0,montant_investi:0};
+  const{error}=existing?await SB.from("impots").update(v).eq("id",existing.id):await SB.from("impots").insert(v);
+  if(error){toast("Erreur : "+error.message);return}await loadImp();toast("Suivi des dons enregistré");return;
+ }
+ const li=ev.target.closest("li[data-y]");if(li&&ev.target.closest(".lb")){IOPEN[li.dataset.y]=!IOPEN[li.dataset.y];renderImp()}
+});
 const irOpen=r=>{RI=r;$("irt").textContent=r?"Modifier la ligne":"Nouvelle ligne";$("ira").value=r?r.annee:now.getFullYear();$("irl").value=r?r.libelle:"Girardin";
- $("iri").value=r&&r.montant_investi!=null?r.montant_investi:"";$("irr").value=r&&r.reduction!=null?r.reduction:"";$("irn").value=r&&r.note||"";$("irx").hidden=!r;$("ird").showModal()};
-$("ig").addEventListener("click",ev=>{const li=ev.target.closest("li[data-i]");if(li)irOpen(IMP.find(r=>String(r.id)===li.dataset.i))});
+ $("iri").value=r&&r.montant_investi!=null?r.montant_investi:"";$("irr").value=r&&r.reduction!=null?r.reduction:"";$("irdt").value=r&&r.date_remboursement||"";$("irn").value=r&&r.note||"";$("irx").hidden=!r;$("ird").showModal()};
+$("ig").addEventListener("click",async ev=>{
+ const del=ev.target.closest("button[data-del-i]");
+ if(del){ev.stopPropagation();const id=del.dataset.delI||del.getAttribute("data-del-i"),r=IMP.find(x=>String(x.id)===String(id));if(!r)return;
+  if(!confirm(`Supprimer « ${r.libelle} » pour ${r.annee} ? Cette suppression est définitive.`))return;
+  const{error}=await SB.from("impots").delete().eq("id",r.id);if(error){toast("Erreur : "+error.message);return}await loadImp();toast("Ligne supprimée");return;
+ }
+ const li=ev.target.closest("li[data-i]");if(li)irOpen(IMP.find(r=>String(r.id)===li.dataset.i))
+});
 $("ig2").onclick=()=>irOpen(null);$("irf").onclick=()=>$("ird").close();
-$("irv").onclick=async()=>{const v={annee:parseInt($("ira").value),libelle:$("irl").value.trim(),montant_investi:parseFloat($("iri").value)||0,reduction:parseFloat($("irr").value)||0,note:$("irn").value.trim()||null};
+$("irv").onclick=async()=>{const v={annee:parseInt($("ira").value),libelle:$("irl").value.trim(),montant_investi:parseFloat($("iri").value)||0,reduction:parseFloat($("irr").value)||0,date_remboursement:$("irdt").value||null,note:$("irn").value.trim()||null};
  if(!v.annee||!v.libelle){toast("Année et libellé requis");return}
  const{error}=RI?await SB.from("impots").update(v).eq("id",RI.id):await SB.from("impots").insert(v);
- if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
+ if(error){toast("Erreur : "+error.message);return}$("ird").close();await loadImp();if(AX)renderAn()};
 $("irx").onclick=async()=>{if(!confirm("Supprimer cette ligne ?"))return;const{error}=await SB.from("impots").delete().eq("id",RI.id);
- if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
+ if(error){toast("Erreur : "+error.message);return}$("ird").close();await loadImp();if(AX)renderAn()};
 
 // ===== Extensions : tableau de bord, patrimoine, performances et immobilier =====
 const PROP_DATA=[
