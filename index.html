@@ -67,6 +67,24 @@ li.gh{display:flex;justify-content:space-between;cursor:default;font-weight:700;
 table.am2{width:100%;border-collapse:collapse;font-size:13px}table.am2 th,table.am2 td{padding:5px 4px;text-align:right;border-bottom:1px solid var(--ln)}
 table.am2 th:first-child,table.am2 td:first-child{text-align:left}table.am2 tr.cur td{font-weight:700;background:var(--sf)}table.am2 th{color:var(--mu);font-weight:500}.mb{height:6px;border-radius:3px;background:var(--late);margin-top:4px;opacity:.75}
 button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* Synthèse patrimoniale et investissements */
+.kgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.kpi{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:12px;min-width:0}
+.kpi .v{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-top:4px;overflow-wrap:anywhere}
+.kpi .l{font-size:12px;color:var(--mu)}
+.section-title{margin:22px 0 8px;font-size:16px}
+.pitem{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:13px 2px;border-bottom:1px solid var(--ln);cursor:pointer}
+.pitem .sub{font-size:12px;color:var(--mu);margin-top:3px}
+.pitem .right{text-align:right;font-weight:700;white-space:nowrap}
+.detail{background:var(--sf);padding:12px;border-radius:10px;margin:8px 0 12px}
+.detail table{width:100%;border-collapse:collapse;font-size:13px}
+.detail td{padding:6px 2px;border-bottom:1px solid var(--ln)}.detail td:last-child{text-align:right;font-weight:600}
+.ownerrow{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--ln)}
+.ownerrow select{margin:0;padding:8px;font-size:14px}
+.mini-bar{height:8px;background:var(--ln);border-radius:6px;overflow:hidden;margin:5px 0 10px}.mini-bar i{display:block;height:100%;background:var(--ok)}
+.pillnote{display:inline-block;border:1px solid var(--ln);border-radius:20px;padding:3px 8px;font-size:11px;color:var(--mu)}
+@media(min-width:520px){.kgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -78,7 +96,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="go">Se connecter</button><p class="mu" id="lm"></p>
 </section>
 <section id="ap" hidden>
- <div class="tabs"><button id="t1" class="on">Opérations</button><button id="t6">Prêts</button><button id="t8">Impôts</button><button id="t5">Analyse</button><button id="t4">Fixes</button><button id="t2">Import</button><button id="t7">Paramètres</button><button id="t3">Quitter</button></div>
+ <div class="tabs"><button id="t9">Tableau de bord</button><button id="t10">Patrimoine</button><button id="t11">Placements</button><button id="t12">Immobiliers</button><button id="t1" class="on">Opérations</button><button id="t6">Prêts</button><button id="t8">Impôts</button><button id="t5">Analyse</button><button id="t4">Fixes</button><button id="t2">Import</button><button id="t7">Paramètres</button><button id="t3">Quitter</button></div>
  <div id="v1">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
   <ul id="ca"></ul><div id="park" hidden><div id="txb">
@@ -98,7 +116,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version du 22/11 (e) · investissements dans l’analyse</p>
+  <div id="log"></div><p class="mu" id="ver">Version du 24/11 · tableau de bord, patrimoine, placements et immobilier</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -133,6 +151,42 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <h2>Impôts</h2>
   <h3 style="margin:14px 0 4px">Dons</h3><p class="mu">Opérations des comptes courants classées « don » (réduction estimée à 66 %).</p><ul id="idn"></ul>
   <h3 style="margin:20px 0 4px">Girardin et autres réductions</h3><button class="btn alt" id="ig2">+ Ajouter une ligne</button><ul id="ig"></ul>
+ </div>
+ <div id="v9" hidden>
+  <h2>Tableau de bord</h2><p class="mu" id="dashperiod"></p>
+  <div class="kgrid">
+   <div class="kpi"><div class="l">Solde net du mois</div><div class="v" id="dashnet">—</div><div class="l">Hors versements vers placements repérés</div></div>
+   <div class="kpi"><div class="l">Reste à payer</div><div class="v" id="dashrest">—</div><div class="l">Charges non pointées du mois</div></div>
+   <div class="kpi"><div class="l">Retards</div><div class="v" id="dashlate">—</div><div class="l">Charges échues non réglées</div></div>
+   <div class="kpi"><div class="l">Lignes à compléter</div><div class="v" id="dashtodo">—</div><div class="l">Opérations sans catégorie</div></div>
+   <div class="kpi"><div class="l">Taux d’épargne</div><div class="v" id="dashrate">—</div><div class="l">Épargne estimée / revenus</div></div>
+   <div class="kpi"><div class="l">Versements programmés</div><div class="v">505 €/mois</div><div class="l">Moyenne retenue selon nos échanges</div></div>
+  </div>
+  <h3 class="section-title">Versements programmés</h3>
+  <div class="card" style="cursor:default"><table class="am2"><tr><td>Assurance-vie Pierre</td><td>200 €/mois</td></tr><tr><td>Assurance-vie Marion (PONY)</td><td>200 €/mois</td></tr><tr><td>Trade Republic</td><td>105 €/mois</td></tr><tr><td>Kraken</td><td>30 €/semaine</td></tr></table><p class="mu">La moyenne mensuelle de 505 € est conservée telle que définie ensemble.</p></div>
+  <p class="mu">La synthèse n’affiche pas de prévision de trésorerie ni de prochaines échéances.</p>
+ </div>
+ <div id="v10" hidden>
+  <h2>Patrimoine</h2><div class="big" id="networth">—</div><div class="mu">Patrimoine net estimé : actifs financiers et immobiliers moins capitaux restant dus.</div>
+  <h3 class="section-title">Répartition par titulaire</h3><div id="ownerTotals"></div>
+  <h3 class="section-title">Attribution des comptes</h3><p class="mu">Les règles sont préremplies selon nos échanges. Tu peux les ajuster ici ; elles sont conservées sur cet appareil.</p><div id="ownerRules"></div>
+  <h3 class="section-title">Historique du patrimoine</h3><div id="wealthHistory"></div>
+  <p class="mu">L’historique est recalculé à partir des soldes, positions et tableaux d’amortissement disponibles. Les valeurs immobilières restent aux dernières estimations saisies. Pour le PTZ et La Bernerie, faute d’historique d’amortissement complet, le dernier capital connu est maintenu constant dans les mois antérieurs.</p>
+ </div>
+ <div id="v11" hidden>
+  <h2>Performance des placements</h2><p class="mu">Assurance-vie, PEA, Trade Republic et Kraken. Les performances sont calculées à partir des valorisations enregistrées et des flux détectés.</p>
+  <div class="kgrid">
+   <div class="kpi"><div class="l">Valeur actuelle</div><div class="v" id="invtotal">—</div></div>
+   <div class="kpi"><div class="l">Variation depuis valorisation précédente</div><div class="v" id="invchange">—</div></div>
+   <div class="kpi"><div class="l">Performance estimée</div><div class="v" id="invperf">—</div><div class="l">Après neutralisation des flux identifiés</div></div>
+  </div>
+  <div id="investmentRows"></div>
+  <p class="mu">Pour Trade Republic, les titres sont séparés des espèces : les espèces sont identifiées dans les positions (EUR / liquidités) ou calculées par différence entre le solde du compte et la valeur des titres.</p>
+ </div>
+ <div id="v12" hidden>
+  <h2>Immobiliers</h2><div class="big" id="propertyTotal">—</div><div class="mu">Valeur nette de tes quotes-parts, après déduction des capitaux restant dus.</div>
+  <div id="propertyList"></div>
+  <p class="mu">Saint-Denis et Les Mureaux reprennent automatiquement les prêts de l’onglet Prêts. La dette du PTZ dispose d’un solde de référence au 21/11/2026 si aucun solde plus récent n’est disponible.</p>
  </div>
  <div id="v6" hidden>
   <h2>Prêts</h2><p class="mu">Appuyez sur un prêt pour voir son tableau d’amortissement.</p><ul id="pl"></ul>
@@ -298,8 +352,12 @@ document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset
 $("cpf").onchange=()=>loadView();
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}renderCa();loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
-function tab(n){[1,2,4,5,6,7,8].forEach(v=>{$("v"+v).hidden=v!==n;$("t"+v).classList.toggle("on",v===n)})}
+function tab(n){[1,2,4,5,6,7,8,9,10,11,12].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;if($("t"+v))$("t"+v).classList.toggle("on",v===n)})}
 $("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=()=>{tab(7);renderCat()};$("t8").onclick=()=>{tab(8);loadImp()};
+$("t9").onclick=()=>{tab(9);loadDashboard()};
+$("t10").onclick=()=>{tab(10);loadWealth()};
+$("t11").onclick=()=>{tab(11);loadInvestments()};
+$("t12").onclick=()=>{tab(12);loadProperties()};
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
 $("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);AS===2?loadCatAn():loadAn()};
 const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
@@ -802,6 +860,186 @@ $("irv").onclick=async()=>{const v={annee:parseInt($("ira").value),libelle:$("ir
  if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
 $("irx").onclick=async()=>{if(!confirm("Supprimer cette ligne ?"))return;const{error}=await SB.from("impots").delete().eq("id",RI.id);
  if(error){toast("Erreur : "+error.message);return}$("ird").close();loadImp()};
+
+// ===== Extensions : tableau de bord, patrimoine, performances et immobilier =====
+const PROP_DATA=[
+ {id:"sd",name:"Appartement Saint-Denis",value:404667,share:1,rent:1407,use:"Location",loanNames:["Saint Denis","Saint Denis PTZ"],ptzFallback:41666.85,ptzDate:"2026-11-21",end:"2037-12",owner:"Joint",borrowedFallback:0},
+ {id:"lm",name:"Maison Les Mureaux",value:600000,share:1,rent:0,use:"Résidence principale",loanNames:["Les Mureaux"],end:"2047-06",owner:"Joint"},
+ {id:"po",name:"Appartement Pornic (indivision)",value:245100,share:.13,rent:0,use:"À préciser",loanNames:[],end:"",owner:"Joint"},
+ {id:"br",name:"Maison La Bernerie-en-Retz (PINEL)",value:439392,share:.25,rent:938,use:"Location (PINEL)",loanNames:[],staticDebt:46795,staticDebtDate:"2026-11-21",payment:776.98,end:"",owner:"Joint"}
+];
+const OWNERS=["Pierre","Marion","Enfants","Joint"];
+let OWNER_MAP={};
+try{OWNER_MAP=JSON.parse(localStorage.getItem("finance_owner_map")||"{}")||{}}catch(e){}
+const ownFor=c=>{
+ if(OWNER_MAP[c.id])return OWNER_MAP[c.id];
+ const n=String(c.nom||"").toLowerCase(),pr=String(c.produit||"").toLowerCase(),tit=String(c.titulaire||"").toLowerCase(),fam=String(c.famille||"").toLowerCase();
+ if(pr.includes("pony")||n.includes("pony"))return "Marion";
+ if(pr.includes("kraken")||n.includes("kraken")||pr.includes("trade republic")||n.includes("trade republic")||n.includes("boursorama")||n.includes("bourso"))return "Pierre";
+ if(/enfant|valentin|ana[eé]/i.test(n+" "+tit))return "Enfants";
+ if(/joint|commun/i.test(n+" "+tit))return "Joint";
+ if(/marion/i.test(tit+" "+n))return "Marion";
+ if(/pierre/i.test(tit+" "+n))return "Pierre";
+ if(/investissements|bourse|crypto/.test(fam))return "Pierre";
+ if(fam==="comptes courants"&&n==="pierre")return "Pierre";
+ return "Joint";
+};
+function ownerSet(c,v){OWNER_MAP[c.id]=v;try{localStorage.setItem("finance_owner_map",JSON.stringify(OWNER_MAP))}catch(e){}}
+const money=n=>eur(Number(n||0));
+const latestLoan=(p,d= dstr(now))=>{
+ const sch=(EC[p.id]||[]).filter(x=>x.date<=d).sort((a,b)=>a.date.localeCompare(b.date));
+ const sb=(SOA||[]).filter(x=>x.numero===p.numero&&x.date<=d).sort((a,b)=>a.date.localeCompare(b.date)).pop();
+ if(sb)return Math.abs(Number(sb.solde));
+ if(sch.length)return Math.abs(Number(sch[sch.length-1].capital_fin||0));
+ return null;
+};
+const loanInitial=p=>{
+ const sch=EC[p.id]||[];
+ return Number(p.montant_emprunte||0)||Number(sch[0]&&sch[0].capital_debut||0)||0;
+};
+const loanEnd=p=>{
+ const sch=EC[p.id]||[];
+ return sch.length?sch[sch.length-1].date.slice(0,7):"";
+};
+function propertyDebt(prop,d=dstr(now)){
+ let debt=0,borrowed=0,ends=[];
+ for(const nm of prop.loanNames||[]){
+  const p=PR.find(x=>String(x.nom||"").toLowerCase()===nm.toLowerCase());
+  if(!p){
+   if(nm==="Saint Denis PTZ"){debt+=prop.ptzFallback;ends.push("2037-04")}
+   continue;
+  }
+  let b=latestLoan(p,d);
+  if(b==null&&nm==="Saint Denis PTZ")b=prop.ptzFallback;
+  debt+=Number(b||0);borrowed+=loanInitial(p);
+  const e=loanEnd(p);if(e)ends.push(e);
+ }
+ if(prop.staticDebt){debt+=prop.staticDebt}
+ return {debt,borrowed,end:ends.sort().slice(-1)[0]||prop.end||""};
+}
+function propNet(prop,d=dstr(now)){
+ const db=propertyDebt(prop,d);
+ return {gross:prop.value*prop.share,debt:db.debt*prop.share,net:(prop.value-db.debt)*prop.share,db};
+}
+async function ensureFinanceData(){
+ if(!CPT.length)await loadRef();
+ if(!SOA.length)await loadSo();
+ if(!PR.length)await loadPr();
+ if(!TXB)await loadTxAll();
+}
+function currentAccountValue(c,d=dstr(now)){
+ if(c.famille==="Investissements"){
+  if(String(c.nom||"").toUpperCase()==="PONY")return Math.max(0,Number(c.montant_initial||0)-PONYTX.filter(x=>x.d<=d).reduce((t,x)=>t+x.a,0));
+  const v=balC(c,d);return v==null?Number(c.montant_initial||0):v;
+ }
+ const v=balC(c,d);
+ return v==null?0:Number(v);
+}
+async function loadDashboard(){
+ try{
+  await ensureFinanceData();
+  const start=ymd(now.getFullYear(),now.getMonth(),1),end=ymd(now.getFullYear(),now.getMonth()+1,1);
+  const tx=await all(()=>SB.from("transactions").select("id,date,libelle,montant,categorie,sous_categorie,statut_cat,compte_id").gte("date",start).lt("date",end).order("date"));
+  const income=tx.filter(x=>Number(x.montant)>0).reduce((a,x)=>a+Number(x.montant),0);
+  const investRx=/PONY|ASSURANCE.?VIE|TRADE.?REPUBLIC|KRAKEN|PEA|VERSEMENT/i;
+  const expenses=tx.filter(x=>Number(x.montant)<0&&!investRx.test(x.libelle||"")).reduce((a,x)=>a+Number(x.montant),0);
+  const net=income+expenses;
+  const rate=income>0?net/income*100:0;
+  await loadCF();
+  const today=new Date();today.setHours(0,0,0,0);
+  const pending=FO.filter(x=>Number(x.c.montant)<0&&!x.p);
+  const late=pending.filter(x=>x.dt<today);
+  const todo=tx.filter(x=>x.statut_cat==="a_completer").length;
+  $("dashperiod").textContent=MO[now.getMonth()][0].toUpperCase()+MO[now.getMonth()].slice(1)+" "+now.getFullYear();
+  $("dashnet").textContent=money(net);$("dashrest").textContent=money(pending.reduce((a,x)=>a+Math.abs(Number(x.c.montant)),0));
+  $("dashlate").textContent=late.length+" charge(s)";$("dashtodo").textContent=String(todo);$("dashrate").textContent=rate.toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
+ }catch(e){toast("Tableau de bord : "+e.message)}
+}
+async function loadWealth(){
+ try{
+  await ensureFinanceData();
+  const d=dstr(now),accounts=CPT.reduce((a,c)=>{if(/compte liquidit[ée] pea/i.test(String(c.produit||"")))return a;const v=currentAccountValue(c,d);a[ownFor(c)]=(a[ownFor(c)]||0)+v;return a},{Pierre:0,Marion:0,Enfants:0,Joint:0});
+  const props=PROP_DATA.map(p=>({p,...propNet(p,d)}));
+  props.forEach(x=>accounts[x.p.owner]=(accounts[x.p.owner]||0)+x.net);
+  const debts=PR.reduce((a,p)=>a+Number(latestLoan(p,d)||0),0);
+  const propDebtAll=props.reduce((a,x)=>a+x.debt,0);
+  // Les prêts immobiliers déjà déduits des valeurs nettes des biens ne sont pas déduits une seconde fois.
+  const total=Object.values(accounts).reduce((a,b)=>a+b,0);
+  $("networth").textContent=money(total);
+  $("ownerTotals").innerHTML=OWNERS.map(o=>{const v=accounts[o]||0,pct=total?Math.round(v/total*1000)/10:0;return `<div class="pitem" style="cursor:default"><div><b>${o}</b><div class="sub">${pct.toLocaleString("fr-FR",{maximumFractionDigits:1})} % du patrimoine net</div></div><div class="right">${money(v)}</div></div>`}).join("");
+  const list=CPT.map(c=>`<div class="ownerrow"><span>${esc(c.nom)} <small class="mu">· ${esc(c.famille||"Compte")}</small></span><select data-owner="${esc(c.id)}">${OWNERS.map(o=>`<option ${ownFor(c)===o?"selected":""}>${o}</option>`).join("")}</select></div>`).join("");
+  $("ownerRules").innerHTML=list||'<p class="mu">Aucun compte chargé.</p>';
+  $("ownerRules").querySelectorAll("select[data-owner]").forEach(el=>el.onchange=()=>{ownerSet({id:el.dataset.owner},el.value);loadWealth()});
+  const hist=[];
+  for(let i=11;i>=0;i--){
+   const dt=new Date(now.getFullYear(),now.getMonth()-i+1,0),ds=dstr(dt);
+   let av=0;
+   for(const c of CPT){if(/compte liquidit[ée] pea/i.test(String(c.produit||"")))continue;av+=currentAccountValue(c,ds)}
+   let pv=0;for(const p of PROP_DATA)pv+=propNet(p,ds).net;
+   hist.push({label:MO[dt.getMonth()].slice(0,3)+" "+String(dt.getFullYear()).slice(2),value:av+pv});
+  }
+  const max=Math.max(1,...hist.map(x=>Math.abs(x.value)));
+  $("wealthHistory").innerHTML=hist.map(x=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${x.label}</span><b>${money(x.value)}</b></div><div class="mini-bar"><i style="width:${Math.max(1,Math.abs(x.value)/max*100)}%"></i></div></div>`).join("");
+ }catch(e){toast("Patrimoine : "+e.message)}
+}
+async function loadInvestments(){
+ try{
+  await ensureFinanceData();
+  const rows=await all(()=>SB.from("positions").select("*").order("date"));
+  const invAccounts=CPT.filter(c=>!(/compte liquidit[ée] pea/i.test(String(c.produit||"")))&&(["Investissements","Bourse","Crypto"].includes(c.famille)||/trade.?republic|kraken|pea|assurance.?vie|pony/i.test((c.nom||"")+" "+(c.produit||""))));
+  let total=0,delta=0,perf=0;const out=[];
+  for(const c of invAccounts){
+   const allp=rows.filter(x=>x.compte_id===c.id),dates=[...new Set(allp.map(x=>x.date))].sort();
+   const last=dates[dates.length-1],prev=dates.length>1?dates[dates.length-2]:null;
+   const snap=d=>allp.filter(x=>x.date===d);
+   const valOf=(a)=>a.reduce((t,x)=>t+Number(x.valeur||0),0);
+   const latest=last? snap(last):[],prior=prev?snap(prev):[];
+   const cashLabels=/^(EUR|CASH|ESPECES|ESPÈCES|LIQUIDITÉS|LIQUIDITES)$/i;
+   const isCash=x=>cashLabels.test(String(x.libelle||"").trim());
+   const portfolio=valOf(latest.filter(x=>!isCash(x))),cashPos=valOf(latest.filter(isCash));
+   const accountVal=currentAccountValue(c,dstr(now));
+   let cash=cashPos;
+   if(/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""))){cash=Math.max(0,cashPos||accountVal-portfolio)}
+   else if(cashPos===0)cash=0;
+   const current=portfolio+cash || accountVal;
+   const previous=prev?valOf(prior):null;
+   const change=previous==null?null:current-previous;
+   const tx=await all(()=>SB.from("transactions").select("date,montant,libelle").eq("compte_id",c.id).gte("date",prev||last||"1900-01-01").lte("date",last||dstr(now)));
+   const netFlows=tx.reduce((a,x)=>a+Number(x.montant||0),0);
+   const performance=previous==null?null:(current-previous-netFlows);
+   total+=current;if(change!=null)delta+=change;if(performance!=null)perf+=performance;
+   const isTR=/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""));
+   out.push(`<div class="card" style="cursor:default"><h3>${esc(c.nom)}</h3><div class="kgrid"><div class="kpi"><div class="l">${isTR?"Portefeuille titres":"Valorisation"}</div><div class="v">${money(isTR?portfolio:current-cash)}</div></div>${isTR?`<div class="kpi"><div class="l">Espèces</div><div class="v">${money(cash)}</div></div>`:""}<div class="kpi"><div class="l">Total</div><div class="v">${money(current)}</div></div><div class="kpi"><div class="l">Variation observée</div><div class="v">${change==null?"Historique insuffisant":money(change)}</div></div><div class="kpi"><div class="l">Performance estimée</div><div class="v">${performance==null?"Historique insuffisant":money(performance)}</div></div></div><p class="mu">Dernière valorisation : ${last||"aucune position importée"}${prev?" · comparaison avec "+prev:""}${isTR&&!latest.length?" · portefeuille titres non importé : le solde est présenté provisoirement en espèces.":""}</p></div>`);
+  }
+  $("invtotal").textContent=money(total);$("invchange").textContent=money(delta);$("invperf").textContent=money(perf);
+  $("investmentRows").innerHTML=out.join("")||'<p class="mu">Aucun compte de placement reconnu. Importez les valorisations depuis l’onglet Import.</p>';
+ }catch(e){toast("Placements : "+e.message)}
+}
+async function loadProperties(){
+ try{
+  await ensureFinanceData();
+  const data=PROP_DATA.map(p=>({p,...propNet(p)}));
+  const total=data.reduce((a,x)=>a+x.net,0);
+  $("propertyTotal").textContent=money(total);
+  $("propertyList").innerHTML=data.map(x=>{
+   const p=x.p,db=x.db;
+   const details=`<div class="detail"><table>
+    <tr><td>Valeur totale du bien</td><td>${money(p.value)}</td></tr>
+    <tr><td>Quote-part retenue</td><td>${(p.share*100).toLocaleString("fr-FR")}%</td></tr>
+    <tr><td>Valeur de ta quote-part</td><td>${money(x.gross)}</td></tr>
+    <tr><td>Capital emprunté initial</td><td>${db.borrowed>0?money(db.borrowed):"Non renseigné"}</td></tr>
+    <tr><td>Capital restant dû (quote-part)</td><td>${money(x.debt)}</td></tr>
+    <tr><td>Usage</td><td>${esc(p.use)}</td></tr>
+    <tr><td>Loyer mensuel (quote-part indicative)</td><td>${money(p.rent*p.share)}</td></tr>
+    <tr><td>Fin du prêt</td><td>${esc(db.end||"Non renseignée")}</td></tr>
+    ${p.payment?`<tr><td>Mensualité totale déclarée</td><td>${money(p.payment)}</td></tr>`:""}
+   </table></div>`;
+   return `<div class="pitem" data-property="${p.id}"><div><b>${esc(p.name)}</b><div class="sub">${(p.share*100).toLocaleString("fr-FR")}% détenu</div></div><div class="right">${money(x.net)}</div></div><div id="pd-${p.id}" hidden>${details}</div>`;
+  }).join("");
+  $("propertyList").querySelectorAll("[data-property]").forEach(el=>el.onclick=()=>{const d=$("pd-"+el.dataset.property);d.hidden=!d.hidden});
+ }catch(e){toast("Immobiliers : "+e.message)}
+}
+
 let PONYSUM=0,PONYTX=[];
 
 </script>
