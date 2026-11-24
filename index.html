@@ -134,7 +134,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   </div>
   <div id="an2" hidden>
    <div class="nav"><button id="zp" aria-label="Année précédente">‹</button><h2 id="zy" style="font-size:16px"></h2><button id="zn" aria-label="Année suivante">›</button></div>
-   <select id="zm"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select><div class="card" style="cursor:default;margin:10px 0"><b>Catégories à afficher dans le graphique</b><div id="catChartChoices" class="choice-grid"></div></div>
+   <select id="zm"><option value="1">Mois du 26 au 25 (comme l’Excel)</option><option value="0">Mois civil</option></select><div class="card" style="cursor:default;margin:10px 0"><b>Catégories à afficher dans le graphique</b><div class="chips" style="margin-top:8px"><button type="button" id="catChartAll">Tout sélectionner</button><button type="button" id="catChartNone">Tout désélectionner</button></div><div id="catChartChoices" class="choice-grid"></div></div>
    <div id="zc" style="margin-top:10px"></div><div id="zl" class="mu" style="margin:4px 0 10px"></div>
    <div style="overflow-x:auto"><table class="am2" id="zt"></table></div>
    <p class="mu">Comptes courants, 12 mois glissants. Charges en négatif, dépenses en positif, comme l’onglet d’analyse de l’Excel.</p>
@@ -513,6 +513,7 @@ $("yn").onclick=()=>{AMo++;if(AMo>11){AMo=0;AY++}loadAn()};
 $("ya").addEventListener("click",ev=>{const c=ev.target.closest(".card[data-b]");if(!c)return;AOPEN[c.dataset.b]=!AOPEN[c.dataset.b];renderAn()});
 const DEPL=["alimentation","course","maison","maison mureaux","santé","vêtement","achat","bébé","enfants","dab","retrait dab"];
 async function loadCatAn(){try{
+ if(!CAT.length)await loadRef();
  const cf=(await SB.from("charges_fixes").select("*").eq("actif",true)).data||[];
  const st=new Date(ZE.y,ZE.m-12,1),en=new Date(ZE.y,ZE.m+1,1);
  const rows=await all(()=>fc(SB.from("transactions").select("date,montant,categorie,sous_categorie")).gte("date",dstr(st)).lt("date",dstr(en)).order("id"));
@@ -531,15 +532,39 @@ function renderCatAn(){
  const row=(l,a,em)=>"<tr><td>"+l+"</td>"+K.map(k=>"<td>"+(em?"":f2(a[k]))+"</td>").join("")+"</tr>";
  const fut=(w)=>w.y>now.getFullYear()||(w.y===now.getFullYear()&&w.m>now.getMonth());
  $("zt").innerHTML="<tr>"+H.map(x=>"<th>"+x+"</th>").join("")+"</tr>"+W.map((w,i)=>row(MO[w.m].slice(0,4)+". "+String(w.y).slice(2),Z[i],fut(w))).join("")+row("Total",T,false).replace("<tr>",'<tr class="cur">');
- const categoryDefs=[{key:"fx",name:"Fixe payé"},{key:"dep",name:"Dépense"},{key:"loi",name:"Loisir"},{key:"exc",name:"Exceptionnelle"},{key:"vac",name:"Vacances"},{key:"bar",name:"Bar"},{key:"res",name:"Restaurant"}];
+ const categoryNames=[...new Set([
+  ...CAT.map(x=>x.categorie),
+  ...rows.map(x=>x.categorie||"À catégoriser")
+ ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,"fr"));
+ const categoryDefs=categoryNames.map(name=>({key:name,name}));
  if(CAT_CHART_SELECTED===null)CAT_CHART_SELECTED=categoryDefs.map(x=>x.key);
- const choices=$("catChartChoices");choices.innerHTML=categoryDefs.map(x=>`<label><input type="checkbox" data-cat-chart="${x.key}" ${CAT_CHART_SELECTED.includes(x.key)?"checked":""}>${x.name}</label>`).join("");
+ CAT_CHART_SELECTED=CAT_CHART_SELECTED.filter(k=>categoryDefs.some(x=>x.key===k));
+ const choices=$("catChartChoices");
+ choices.innerHTML=categoryDefs.map(x=>`<label><input type="checkbox" data-cat-chart="${esc(x.key)}" ${CAT_CHART_SELECTED.includes(x.key)?"checked":""}>${esc(x.name)}</label>`).join("")||'<p class="mu">Aucune catégorie disponible.</p>';
  choices.querySelectorAll("input[data-cat-chart]").forEach(el=>el.onchange=()=>{const k=el.dataset.catChart;CAT_CHART_SELECTED=el.checked?[...CAT_CHART_SELECTED,k]:CAT_CHART_SELECTED.filter(x=>x!==k);renderCatAn()});
- const chosen=categoryDefs.filter(x=>CAT_CHART_SELECTED.includes(x.key)),colors=["#0f4c5c","#2f9e8f","#e0a526","#c2412b","#7a5cc2","#3b82a0","#82945b"];
- const segs=Z.map(a=>chosen.map(x=>Math.max(0,x.key==="fx"?-a.fx:x.key==="bar"?a.bar:x.key==="res"?a.res:a[x.key]))),mx=Math.max(1,...segs.map(s=>s.reduce((x,y)=>x+y,0)));
- let svg=`<svg viewBox="0 0 360 200" width="100%" role="img" aria-label="Dépenses par catégorie et par mois"><text x="2" y="12" font-size="9" fill="currentColor">${eur(mx)}</text><line x1="0" y1="170" x2="360" y2="170" stroke="currentColor" stroke-opacity=".25"/>`;
- segs.forEach((sg,i)=>{let y=170;const x=10+i*29;sg.forEach((v,j)=>{const h=v/mx*148;y-=h;if(h>0.3)svg+=`<rect x="${x}" y="${y.toFixed(1)}" width="21" height="${h.toFixed(1)}" fill="${colors[categoryDefs.findIndex(q=>q.key===chosen[j].key)]}"/>`});svg+=`<text x="${x+10.5}" y="184" font-size="8" text-anchor="middle" fill="currentColor">${MO[W[i].m].slice(0,3)}</text>`});svg+="</svg>";
- $("zc").innerHTML=svg;$("zl").innerHTML=chosen.map(x=>`<span style="display:inline-block;margin-right:10px"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${colors[categoryDefs.findIndex(q=>q.key===x.key)]};margin-right:4px"></i>${x.name}</span>`).join("");
+ $("catChartAll").onclick=()=>{CAT_CHART_SELECTED=categoryDefs.map(x=>x.key);renderCatAn()};
+ $("catChartNone").onclick=()=>{CAT_CHART_SELECTED=[];renderCatAn()};
+ const chosen=categoryDefs.filter(x=>CAT_CHART_SELECTED.includes(x.key));
+ const colors=["#0f4c5c","#2f9e8f","#e0a526","#c2412b","#7a5cc2","#3b82a0","#82945b","#b56576","#6c757d","#d97706","#4d908e","#9b5de5"];
+ const colorFor=i=>colors[i%colors.length];
+ const segs=Z.map((a,i)=>chosen.map(x=>Math.max(0,-rows.filter(r=>{
+  let y=+r.date.slice(0,4),m=+r.date.slice(5,7)-1;
+  if(ZMODE&&+r.date.slice(8)>=26){m++;if(m>11){m=0;y++}}
+  return y===W[i].y&&m===W[i].m&&(r.categorie||"À catégoriser")===x.key&&Number(r.montant)<0;
+ }).reduce((t,r)=>t+Number(r.montant),0))));
+ const totals=segs.map(a=>a.reduce((t,v)=>t+v,0));
+ const max=Math.max(1,...totals);
+ const rawStep=max/4,pow=Math.pow(10,Math.floor(Math.log10(rawStep))),norm=rawStep/pow;
+ const step=(norm<=1?1:norm<=2?2:norm<=5?5:10)*pow;
+ const top=Math.max(step,Math.ceil(max/step)*step);
+ const fmtAxis=n=>n>=10000?(n/1000).toLocaleString("fr-FR",{maximumFractionDigits:0})+" k":Math.round(n).toLocaleString("fr-FR");
+ const left=48,right=396,topY=18,baseY=188,plotH=baseY-topY,plotW=right-left;
+ let svg=`<svg viewBox="0 0 405 224" width="100%" role="img" aria-label="Dépenses mensuelles par catégorie avec échelle graduée">`;
+ for(let v=0;v<=top+step/100;v+=step){const y=baseY-(v/top)*plotH;svg+=`<line x1="${left}" y1="${y.toFixed(1)}" x2="${right}" y2="${y.toFixed(1)}" stroke="currentColor" stroke-opacity=".16"/><text x="${left-6}" y="${(y+3).toFixed(1)}" font-size="9" text-anchor="end" fill="currentColor">${fmtAxis(v)}</text>`}
+ segs.forEach((sg,i)=>{let y=baseY;const slot=plotW/12,x=left+i*slot+slot*.18,w=slot*.64;sg.forEach((v,j)=>{const h=v/top*plotH;y-=h;if(h>0.25)svg+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${colorFor(categoryDefs.findIndex(q=>q.key===chosen[j].key))}"/>`});svg+=`<text x="${(left+(i+.5)*slot).toFixed(1)}" y="205" font-size="8" text-anchor="middle" fill="currentColor">${MO[W[i].m].slice(0,3)}</text>`});
+ svg+="</svg>";
+ $("zc").innerHTML=chosen.length?svg:'<p class="mu">Sélectionne au moins une catégorie pour afficher le graphique.</p>';
+ $("zl").innerHTML=chosen.map(x=>{const i=categoryDefs.findIndex(q=>q.key===x.key);return `<span style="display:inline-block;margin:3px 10px 3px 0"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${colorFor(i)};margin-right:4px"></i>${esc(x.name)}</span>`}).join("");
  $("zy").textContent=MO[W[0].m].slice(0,4)+". "+W[0].y+" – "+MO[W[11].m].slice(0,4)+". "+W[11].y}
 $("zp").onclick=()=>{ZE.y--;loadCatAn()};$("zn").onclick=()=>{ZE.y++;loadCatAn()};$("zm").onchange=()=>{ZMODE=+$("zm").value;loadCatAn()};
 $("as1").onclick=()=>{AS=1;$("an1").hidden=false;$("an2").hidden=true;$("as1").classList.add("on");$("as2").classList.remove("on");loadAn()};
