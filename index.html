@@ -193,6 +193,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <h2 id="sl" style="font-size:15px;word-break:break-word"></h2><p class="mu" id="sa"></p>
  <label>Catégorie<select id="sc"></select></label>
  <label>Sous-catégorie<select id="su"></select></label>
+ <button type="button" class="btn alt" id="addSubOp">+ Ajouter une sous-catégorie</button>
  <datalist id="dc"></datalist><datalist id="ds"></datalist>
  <div class="row"><input type="checkbox" id="sim"><label for="sim" style="color:inherit">Appliquer aux lignes similaires (<span id="sn">0</span>)</label></div>
  <div class="row"><input type="checkbox" id="ru"><label for="ru" style="color:inherit">Créer une règle pour le mot-clé :</label></div>
@@ -333,6 +334,20 @@ $("ls").addEventListener("click",async ev=>{
  $("fx1").checked=false;$("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
 function subs(){fillSel($("su"),subsFor($("sc").value),"")}
 $("sc").addEventListener("input",subs);
+$("addSubOp").onclick=async()=>{
+ const c=$("sc").value.trim();
+ if(!c){toast("Choisissez d’abord une catégorie");return}
+ const n=(prompt("Nom de la nouvelle sous-catégorie pour « "+c+" » :")||"").trim();
+ if(!n)return;
+ if(subsFor(c).some(x=>x.toLocaleLowerCase("fr")===n.toLocaleLowerCase("fr"))){fillSel($("su"),subsFor(c),n);toast("Cette sous-catégorie existe déjà");return}
+ try{
+  const{error}=await SB.from("categories").upsert({categorie:c,sous_categorie:n},{onConflict:"categorie,sous_categorie"});
+  if(error)throw error;
+  CAT.push({categorie:c,sous_categorie:n});
+  fillSel($("su"),subsFor(c),n);
+  toast("Sous-catégorie ajoutée et sélectionnée");
+ }catch(e){toast("Erreur : "+e.message)}
+};
 $("sx").onclick=()=>$("sh").close();
 $("ssv").onclick=async()=>{const c=$("sc").value.trim(),s=$("su").value.trim();if(!c){toast("Choisissez une catégorie");return}
  try{let ids=[cur.id];
