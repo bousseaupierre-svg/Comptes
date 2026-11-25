@@ -116,7 +116,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v8 du 24/11 · historique des placements, DCA-Crypto et PER Pierre</p>
+  <div id="log"></div><p class="mu" id="ver">Version v9 du 25/11 · saisie manuelle PER Pierre et DCA-Crypto en fenêtre modale</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -179,14 +179,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <div class="card" style="cursor:default;margin-top:14px">
    <h3>Achats DCA-Crypto (BTC)</h3>
    <p class="mu">Saisis chaque achat hebdomadaire. L’opération est enregistrée dans Opérations avec la catégorie Placements › DCA-Crypto. La quantité et le prix du BTC sont conservés dans la note.</p>
-   <label class="mu">Compte débité<select id="dcaAccount"></select></label>
-   <div class="choice-grid" style="grid-template-columns:1fr 1fr">
-    <label class="mu">Date<input id="dcaDate" type="date"></label>
-    <label class="mu">Montant investi (€)<input id="dcaAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="30"></label>
-    <label class="mu">Quantité BTC<input id="dcaQty" type="number" min="0" step="0.00000001" inputmode="decimal" placeholder="0,0003"></label>
-    <label class="mu">Prix du BTC (€)<input id="dcaPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 78000"></label>
-   </div>
-   <button type="button" class="btn" id="dcaSave">Enregistrer l’achat</button>
+   <button type="button" class="btn" id="dcaOpen">+ Ajouter un achat DCA-Crypto</button>
+   <p class="mu">Le compte débité est automatiquement « Pierre » ; aucun autre compte ne peut être sélectionné.</p>
    <div id="dcaSummary" style="margin-top:12px"></div>
    <div id="dcaHistory"></div>
   </div>
@@ -236,6 +230,26 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <label>Date de remboursement (laisser vide si non remboursé)<input id="irdt" type="date"></label>
  <label>Note<input id="irn"></label>
  <button class="btn" id="irv">Enregistrer</button><button class="btn alt" id="irx" style="color:var(--late);border-color:var(--late)">Supprimer</button><button class="btn alt" id="irf">Fermer</button></dialog>
+<dialog id="perDialog">
+ <h2 style="font-size:17px">Valorisation du PER Pierre</h2>
+ <p class="mu">Saisis le cumul des versements et la valeur actuelle du portefeuille. La plus ou moins-value est calculée automatiquement.</p>
+ <label>Date de valorisation<input id="perDate" type="date"></label>
+ <label>Montant total investi (€)<input id="perInvested" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
+ <label>Solde du portefeuille (PTF) (€)<input id="perPtf" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
+ <div class="card" style="cursor:default"><small class="mu">Plus / moins-value estimée</small><div class="big" id="perGain" style="font-size:24px">—</div></div>
+ <button type="button" class="btn" id="perSave">Enregistrer la valorisation</button>
+ <button type="button" class="btn alt" id="perClose">Fermer</button>
+</dialog>
+<dialog id="dcaDialog">
+ <h2 style="font-size:17px">Nouvel achat DCA-Crypto</h2>
+ <p class="mu">Le débit sera automatiquement enregistré sur le compte courant Pierre.</p>
+ <label>Date<input id="dcaDate" type="date"></label>
+ <label>Montant investi (€)<input id="dcaAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="30"></label>
+ <label>Quantité BTC<input id="dcaQty" type="number" min="0" step="0.00000001" inputmode="decimal" placeholder="0,0003"></label>
+ <label>Prix du BTC (€)<input id="dcaPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 78000"></label>
+ <button type="button" class="btn" id="dcaSave">Enregistrer l’achat</button>
+ <button type="button" class="btn alt" id="dcaClose">Annuler</button>
+</dialog>
 <div id="toast" role="status"></div>
 <script>
 const SB=supabase.createClient("https://jyhnuezscbmlnknydbmk.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5aG51ZXpzY2JtbG5rbnlkYm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxNjQ0ODMsImV4cCI6MjExMDc0MDQ4M30.1vYFccx7o8iFXLplcQQ6ca1jqXpc9_JWui-i2WdxhpA");
@@ -601,7 +615,10 @@ function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0]
   for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?(c.produit==="Investissement"?(c.echeance?"échéance "+fd(c.echeance):"investissement"):"solde au "+fd(me<dstr(now)?me:dstr(now))):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
  $("ca").innerHTML=h;
  if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";const ps=POSL[SELC];if(ps&&ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0);w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th><th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${p.libelle}</td><td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:6})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td><td></td><td></td><td>${eur(t)}</td></tr></table></div>`)}w.appendChild($("txb"));li.after(w)}}}
-$("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;SELC=SELC===id?null:id;
+$("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;
+ const account=CPT.find(c=>c.id===id);
+ if(account&&/per.?pierre/i.test(String(account.nom||"")+" "+String(account.produit||""))){openPerDialog(account);return}
+ SELC=SELC===id?null:id;
  $("cpf").value=SELC===null||SELC==="*"?"":SELC;renderCa();if(SELC!==null)loadView()});
 $("t3").onclick=async()=>{await SB.auth.signOut();show(false)};
 function csv(t,sp=","){t=t.replace(/^\ufeff/,"");const R=[];let r=[],c="",q=false;
@@ -734,7 +751,7 @@ async function impKraken(R,h){const c=CPT.find(x=>x.produit==="Kraken");if(!c)th
   rows.push({compte_id:c.id,date:d,libelle:a,quantite:q,valeur:a==="EUR"?q:0,prix_unitaire:a==="EUR"?1:null})}
  const{error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error)throw error;
  return c.nom+" : "+rows.length+" actifs (cours mis à jour ensuite)"}
-const NON_ASSET_LABEL=/^(investi|épargne|epargne|plus[- ]?value|variation mois|achat)$/i;
+const NON_ASSET_LABEL=/^(investi|épargne|epargne|plus[- ]?value|\+\/-\s*value|variation mois|achat)$/i;
 function positionValue(batch){
  const rows=batch||[];
  const total=rows.find(x=>/^total$/i.test(String(x.libelle||"")));
@@ -1188,17 +1205,11 @@ async function loadInvestments(){
   await renderDcaCrypto();
  }catch(e){toast("Placements : "+e.message)}
 }
-function fillDcaAccounts(){
- const sel=$("dcaAccount");if(!sel)return;const old=sel.value;
- const list=CPT.filter(c=>c.famille==="Comptes courants");
- sel.innerHTML=list.map(c=>`<option value="${esc(c.id)}">${esc(c.nom)}</option>`).join("");
- if(old&&list.some(c=>c.id===old))sel.value=old;else{const pierre=list.find(c=>/^pierre$/i.test(c.nom));if(pierre)sel.value=pierre.id;}
- if(!list.length)sel.innerHTML='<option value="">Aucun compte courant</option>';
+function pierreCurrentAccount(){
+ return CPT.find(c=>c.famille==="Comptes courants"&&/^pierre$/i.test(String(c.nom||"")))||null;
 }
 async function renderDcaCrypto(){
- fillDcaAccounts();
- if($("dcaDate")&&!$("dcaDate").value)$("dcaDate").value=dstr(now);
- const account=$("dcaAccount")&&$("dcaAccount").value;
+ const dateEl=$("dcaDate");if(dateEl&&!dateEl.value)dateEl.value=dstr(now);
  const q=SB.from("transactions").select("id,date,libelle,montant,note,compte_id").eq("categorie","Placements").eq("sous_categorie","DCA-Crypto").order("date",{ascending:false}).limit(300);
  const {data,error}=await q;if(error)throw error;
  const list=data||[];let btc=0,invested=0;
@@ -1206,17 +1217,68 @@ async function renderDcaCrypto(){
  $("dcaSummary").innerHTML=`<div class="kgrid"><div class="kpi"><div class="l">Total investi enregistré</div><div class="v">${money(invested)}</div></div><div class="kpi"><div class="l">BTC renseignés dans les achats</div><div class="v">${btc.toLocaleString("fr-FR",{maximumFractionDigits:8})} BTC</div></div></div>`;
  $("dcaHistory").innerHTML=list.length?`<h3 style="margin:14px 0 4px">Historique des achats</h3><div style="overflow-x:auto"><table class="am2"><tr><th>Date</th><th>Compte / libellé</th><th>Quantité BTC</th><th>Prix BTC</th><th>Montant</th></tr>${list.map(x=>{const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i),p=String(x.note||"").match(/PRIX\s*=\s*([0-9.,]+)/i);return `<tr><td>${x.date.split("-").reverse().join("/")}</td><td>${esc(CN(x.compte_id)||"")} · ${esc(x.libelle)}</td><td>${m?num2(m[1]).toLocaleString("fr-FR",{maximumFractionDigits:8}):"—"}</td><td>${p?money(num2(p[1])):"—"}</td><td>${money(Math.abs(Number(x.montant||0)))}</td></tr>`}).join("")}</table></div>`:'<p class="mu">Aucun achat DCA-Crypto enregistré pour le moment.</p>';
 }
+$("dcaOpen").onclick=()=>{
+ const dateEl=$("dcaDate");dateEl.value=dstr(now);
+ $("dcaAmount").value="";$("dcaQty").value="";$("dcaPrice").value="";
+ $("dcaDialog").showModal();
+};
+$("dcaClose").onclick=()=>$("dcaDialog").close();
 $("dcaSave").onclick=async()=>{
- const account=$("dcaAccount").value,date=$("dcaDate").value,amount=Number($("dcaAmount").value),qty=Number(String($("dcaQty").value).replace(",",".")),price=Number(String($("dcaPrice").value).replace(",","."));
- if(!account||!date||!Number.isFinite(amount)||amount<=0){toast("Compte, date et montant positif requis");return}
+ const account=pierreCurrentAccount(),date=$("dcaDate").value,amount=Number(String($("dcaAmount").value).replace(",",".")),qty=Number(String($("dcaQty").value).replace(",",".")),price=Number(String($("dcaPrice").value).replace(",","."));
+ if(!account){toast("Le compte courant Pierre est introuvable dans Paramètres");return}
+ if(!date||!Number.isFinite(amount)||amount<=0){toast("Date et montant positif requis");return}
  if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<=0){toast("Renseigne une quantité BTC et un prix unitaire positifs");return}
  const label="Achat DCA-Crypto BTC";
- const key="DCA-CRYPTO|"+account+"|"+date+"|"+amount.toFixed(2)+"|"+qty.toFixed(8)+"|"+price.toFixed(2);
+ const key="DCA-CRYPTO|"+account.id+"|"+date+"|"+amount.toFixed(2)+"|"+qty.toFixed(8)+"|"+price.toFixed(2);
  const note=`DCA-Crypto | BTC=${qty.toFixed(8)} | PRIX=${price.toFixed(2)} EUR`;
- const {error}=await SB.from("transactions").insert({date,libelle:label,montant:-Math.round(amount*100)/100,note,categorie:"Placements",sous_categorie:"DCA-Crypto",statut_cat:"manuelle",compte_id:account,cle_doublon:KPc(account)+key});
+ const {error}=await SB.from("transactions").insert({date,libelle:label,montant:-Math.round(amount*100)/100,note,categorie:"Placements",sous_categorie:"DCA-Crypto",statut_cat:"manuelle",compte_id:account.id,cle_doublon:KPc(account.id)+key});
  if(error){toast("Erreur : "+error.message);return}
- $("dcaAmount").value="";$("dcaQty").value="";$("dcaPrice").value="";
- await renderDcaCrypto();toast("Achat DCA-Crypto enregistré");
+ $("dcaDialog").close();await renderDcaCrypto();toast("Achat DCA-Crypto enregistré sur le compte Pierre");
+};
+
+// Saisie manuelle de la valorisation du PER Pierre depuis Opérations.
+let PER_ACCOUNT=null;
+async function openPerDialog(account){
+ PER_ACCOUNT=account;
+ const dateEl=$("perDate");dateEl.value=dstr(now);
+ $("perInvested").value="";$("perPtf").value="";
+ try{
+  const {data,error}=await SB.from("positions").select("date,libelle,valeur").eq("compte_id",account.id).order("date",{ascending:false}).limit(100);
+  if(error)throw error;
+  const rows=data||[];const latest=rows.length?rows[0].date:null;
+  if(latest){
+   const snap=rows.filter(r=>r.date===latest);
+   const invested=snap.find(r=>/^épargne$|^epargne$/i.test(String(r.libelle||"")));
+   const ptf=snap.find(r=>/^solde$/i.test(String(r.libelle||"")));
+   dateEl.value=latest;
+   if(invested)$("perInvested").value=Number(invested.valeur||0).toFixed(2);
+   if(ptf)$("perPtf").value=Number(ptf.valeur||0).toFixed(2);
+  }
+ }catch(e){toast("Lecture de l’historique PER : "+e.message)}
+ updatePerGain();$("perDialog").showModal();
+}
+function updatePerGain(){
+ const invested=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",","."));
+ const out=$("perGain");
+ if($("perInvested").value===""||$("perPtf").value===""||!Number.isFinite(invested)||!Number.isFinite(ptf)){out.textContent="—";return}
+ const gain=ptf-invested;out.textContent=money(gain);out.style.color=gain<0?"var(--late)":"var(--ok)";
+}
+$("perInvested").addEventListener("input",updatePerGain);$("perPtf").addEventListener("input",updatePerGain);
+$("perClose").onclick=()=>$("perDialog").close();
+$("perSave").onclick=async()=>{
+ if(!PER_ACCOUNT){toast("Compte PER Pierre introuvable");return}
+ const date=$("perDate").value,invested=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",","."));
+ if(!date||!Number.isFinite(invested)||invested<0||!Number.isFinite(ptf)||ptf<0){toast("Date, montant investi et solde PTF valides requis");return}
+ const gain=Math.round((ptf-invested)*100)/100;
+ const rows=[
+  {compte_id:PER_ACCOUNT.id,date,libelle:"Solde",valeur:Math.round(ptf*100)/100},
+  {compte_id:PER_ACCOUNT.id,date,libelle:"Épargne",valeur:Math.round(invested*100)/100},
+  {compte_id:PER_ACCOUNT.id,date,libelle:"+/- Value",valeur:gain}
+ ];
+ const {error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});
+ if(error){toast("Erreur : "+error.message);return}
+ try{await putSolde(PER_ACCOUNT,date,Math.round(ptf*100)/100)}catch(e){toast("Valorisation enregistrée, mais solde non actualisé : "+e.message)}
+ $("perDialog").close();await loadSo();await loadInvestments();renderCa();toast("Valorisation du PER Pierre enregistrée");
 };
 async function loadProperties(){
  try{
