@@ -101,6 +101,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <div class="tabs"><button id="t9">Tableau de bord</button><button id="t11">Placements</button><button id="t1" class="on">Opérations</button><button id="t6">Prêts</button><button id="t8">Impôts</button><button id="t12">Immobiliers</button><button id="t10">Patrimoine</button><button id="t5">Analyse</button><button id="t4">Fixes</button><button id="t2">Import</button><button id="t7">Paramètres</button><button id="t3">Quitter</button></div>
  <div id="v1">
   <div class="nav"><button id="pv" aria-label="Mois précédent">‹</button><h2 id="mt"></h2><button id="nx" aria-label="Mois suivant">›</button></div>
+  <div style="display:flex;justify-content:flex-end;margin:6px 0"><button class="btn alt" id="addInvestment" type="button">+ Ajouter un investissement</button></div>
   <ul id="ca"></ul><div id="park" hidden><div id="txb">
   <select id="cpf" hidden></select>
   <div class="chips"><button data-f="all" class="on">Mois</button><button data-f="todo" id="c1">À compléter</button><button data-f="sug" id="c2">Suggérées</button></div>
@@ -118,7 +119,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v10 du 26/11 · sélecteur de mois fixe dans Opérations</p>
+  <div id="log"></div><p class="mu" id="ver">Version v11 du 26/11 · historique des investissements, PER mensuel et import par date</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -234,13 +235,26 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <button class="btn" id="irv">Enregistrer</button><button class="btn alt" id="irx" style="color:var(--late);border-color:var(--late)">Supprimer</button><button class="btn alt" id="irf">Fermer</button></dialog>
 <dialog id="perDialog">
  <h2 style="font-size:17px">Valorisation du PER Pierre</h2>
- <p class="mu">Saisis le cumul des versements et la valeur actuelle du portefeuille. La plus ou moins-value est calculée automatiquement.</p>
+ <p class="mu">Saisis uniquement le versement effectué pendant ce mois et la valeur actuelle du portefeuille. Le cumul des versements antérieurs est calculé automatiquement.</p>
  <label>Date de valorisation<input id="perDate" type="date"></label>
- <label>Montant total investi (€)<input id="perInvested" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
+ <label>Montant investi pendant ce mois (€)<input id="perInvested" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
  <label>Solde du portefeuille (PTF) (€)<input id="perPtf" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
+ <p class="mu" id="perCumulative">Investi avant ce mois : 0,00 €</p>
  <div class="card" style="cursor:default"><small class="mu">Plus / moins-value estimée</small><div class="big" id="perGain" style="font-size:24px">—</div></div>
  <button type="button" class="btn" id="perSave">Enregistrer la valorisation</button>
  <button type="button" class="btn alt" id="perClose">Fermer</button>
+</dialog>
+<dialog id="investmentDialog">
+ <h2 id="investmentTitle" style="font-size:17px">Nouvel investissement</h2>
+ <label>Nom de l’investissement<input id="investmentName" maxlength="120" placeholder="Ex. Investissement PME"></label>
+ <label>Montant (€)<input id="investmentAmount" type="number" min="0" step="0.01" inputmode="decimal"></label>
+ <label>Date de début<input id="investmentStart" type="date"></label>
+ <label>Date d’échéance (facultative)<input id="investmentEnd" type="date"></label>
+ <p class="mu">L’investissement sera visible à partir de sa date de début. Il disparaîtra des Opérations à partir du mois de son échéance, tout en restant présent dans les mois précédents.</p>
+ <button type="button" class="btn" id="investmentSave">Enregistrer</button>
+ <button type="button" class="btn alt" id="investmentMature">Clôturer à la fin du mois sélectionné</button>
+ <button type="button" class="btn alt" id="investmentDelete" style="color:var(--late);border-color:var(--late)">Supprimer définitivement</button>
+ <button type="button" class="btn alt" id="investmentClose">Fermer</button>
 </dialog>
 <dialog id="dcaDialog">
  <h2 style="font-size:17px">Nouvel achat DCA-Crypto</h2>
@@ -267,8 +281,8 @@ const norm=l=>l.toUpperCase().replace(/\d{2}\/\d{2}\/\d{2,4}/g," ").replace(/[0-
 async function all(q){let o=[],f=0;for(;;){const{data,error}=await q().range(f,f+999);if(error)throw error;o=o.concat(data);if(data.length<1000)return o;f+=1000}}
 
 // Sauvegarde complète de la base : toutes les tables métier utilisées par l’application.
-const BACKUP_TABLES=["comptes","prets","categories","transactions","regles","charges_fixes","pointages","echeances","soldes","positions","impots"];
-const BACKUP_CONFLICT={comptes:"id",prets:"id",categories:"categorie,sous_categorie",transactions:"id",regles:"id",charges_fixes:"id",pointages:"cle",echeances:"pret_id,date",soldes:"numero,date",positions:"compte_id,date,libelle",impots:"id"};
+const BACKUP_TABLES=["comptes","prets","categories","transactions","regles","charges_fixes","pointages","echeances","soldes","positions","impots","investissements"];
+const BACKUP_CONFLICT={comptes:"id",prets:"id",categories:"categorie,sous_categorie",transactions:"id",regles:"id",charges_fixes:"id",pointages:"cle",echeances:"pret_id,date",soldes:"numero,date",positions:"compte_id,date,libelle",impots:"id",investissements:"id"};
 $("backupExport").onclick=async()=>{
  const b=$("backupExport");b.disabled=true;log("Préparation de la sauvegarde…");
  try{
@@ -289,6 +303,7 @@ $("backupFile").onchange=async ev=>{
   if(file.size>100*1024*1024)throw new Error("Fichier trop volumineux (maximum 100 Mo)");
   const data=JSON.parse(await file.text());
   if(!data||data.format!=="comptes-backup"||data.version!==1||!data.tables)throw new Error("Ce fichier n’est pas une sauvegarde compatible de l’application.");
+  if(!Array.isArray(data.tables.investissements))data.tables.investissements=[];
   const missing=BACKUP_TABLES.filter(t=>!Array.isArray(data.tables[t]));
   if(missing.length)throw new Error("Sauvegarde incomplète : "+missing.join(", "));
   const total=BACKUP_TABLES.reduce((n,t)=>n+data.tables[t].length,0);
@@ -309,6 +324,13 @@ $("backupFile").onchange=async ev=>{
  finally{$("backupFile").disabled=false;ev.target.value=""}
 };
 let CPT=[];
+let MANUAL_INV=[], EDIT_INV=null, POSH={}, PER_PRIOR_INVESTED=0;
+async function loadManualInvestments(){
+ try{MANUAL_INV=await all(()=>SB.from("investissements").select("*").order("date_debut").order("nom"));}
+ catch(e){MANUAL_INV=[];if(!String(e.message||e).toLowerCase().includes("does not exist"))toast("Investissements : "+e.message);}
+}
+const accountStartDate=c=>{const t=(String(c.nom||"")+" "+String(c.produit||"")).toLowerCase();if(/pony/.test(t))return "2026-07-07";if(/pme|élévation|elevation/.test(t))return "2023-12-03";return c.date_debut||null;};
+const accountActiveAt=(c,monthEnd)=>{const start=accountStartDate(c);return (!start||start<=monthEnd)&&(!c.echeance||c.echeance>monthEnd);};
 const CN=id=>(CPT.find(c=>c.id===id)||{}).nom,CID=()=>$("cpi").value;
 const CUR=()=>CPT.filter(c=>c.famille==="Comptes courants").map(c=>c.id);
 const fc=q=>CUR().length?q.in("compte_id",CUR()):q;
@@ -320,7 +342,7 @@ function fillCpt(){
  opt($("cpf"),true);opt($("cpi"),false);
  if(!$("cpi").value&&CPT.length)$("cpi").value=(CPT.find(c=>c.nom==="Pierre")||CPT[0]).id}
 async function loadRef(){SYN=false;
- const cr=await SB.from("comptes").select("*").order("ordre");CPT=cr.data||[];fillCpt();await loadSo();renderCa();
+ const cr=await SB.from("comptes").select("*").order("ordre");CPT=cr.data||[];fillCpt();await loadSo();await loadManualInvestments();renderCa();
  REF=await all(()=>SB.from("transactions").select("id,libelle,categorie,sous_categorie,statut_cat").order("id"));
  RULES=(await all(()=>SB.from("regles").select("*").order("id"))).sort((a,b)=>b.mot_cle.length-a.mot_cle.length);
  const m=new Map();
@@ -608,16 +630,32 @@ $("zp").onclick=()=>{ZE.y--;loadCatAn()};$("zn").onclick=()=>{ZE.y++;loadCatAn()
 $("as1").onclick=()=>{AS=1;$("an1").hidden=false;$("an2").hidden=true;$("as1").classList.add("on");$("as2").classList.remove("on");loadAn()};
 $("as2").onclick=()=>{AS=2;$("an1").hidden=true;$("an2").hidden=false;$("as2").classList.add("on");$("as1").classList.remove("on");loadCatAn()};
 let SELC=null;
-async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};const md={};ps.forEach(p=>{if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYTX=((await SB.from("transactions").select("date,montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).map(x=>({d:x.date,a:Math.abs(Number(x.montant))}));PONYSUM=PONYTX.reduce((t,x)=>t+x.a,0);if(!TXB)await loadTxAll()}catch(e){}}
+async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};POSH={};const md={};ps.forEach(p=>{(POSH[p.compte_id]=POSH[p.compte_id]||[]).push(p);if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYTX=((await SB.from("transactions").select("date,montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).map(x=>({d:x.date,a:Math.abs(Number(x.montant))}));PONYSUM=PONYTX.reduce((t,x)=>t+x.a,0);if(!TXB)await loadTxAll()}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0].toUpperCase()+MO[M].slice(1)+" "+Y;
- const me=ymEnd(Y,M),rowAt=c=>{let b=null;for(const r of SOA)if(r.numero===ck(c)&&r.date<=me&&(!b||r.date>b.date))b=r;return b},invBal=c=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYSUM:0),bal=c=>c.produit==="Investissement"?invBal(c):balC(c,me),fd=d=>d.split("-").reverse().join("/");
+ const me=ymEnd(Y,M),monthStart=ymd(Y,M,1),invBal=(c,d)=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYTX.filter(x=>x.d<=d).reduce((t,x)=>t+x.a,0):0),bal=c=>c.produit==="Investissement"?invBal(c,me):balC(c,me),fd=d=>d.split("-").reverse().join("/");
+ const active=CPT.filter(c=>accountActiveAt(c,me));
+ const manual=MANUAL_INV.filter(x=>x.date_debut<=me&&(!x.date_echeance||x.date_echeance>me));
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
- for(const f of [...new Set(CPT.map(c=>c.famille))]){const cs=CPT.filter(c=>c.famille===f),tot=cs.reduce((t,c)=>t+(bal(c)||0),0);
+ const fams=[...new Set([...active.map(c=>c.famille),...(manual.length?["Investissements"]:[])])];
+ for(const f of fams){const cs=active.filter(c=>c.famille===f),mi=f==="Investissements"?manual:[],tot=cs.reduce((t,c)=>t+(bal(c)||0),0)+mi.reduce((t,x)=>t+Number(x.montant||0),0);
+  if(!cs.length&&!mi.length)continue;
   h+=`<li class="gh"><span>${f}</span><span>${eur(tot)}</span></li>`;
-  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?(c.produit==="Investissement"?(c.echeance?"échéance "+fd(c.echeance):"investissement"):"solde au "+fd(me<dstr(now)?me:dstr(now))):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}}
+  for(const c of cs){const b=bal(c);h+=`<li data-c="${c.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${c.nom}</span><small>${b!==null?(c.produit==="Investissement"?(c.echeance?"échéance "+fd(c.echeance):"investissement"):"solde au "+fd(me<dstr(now)?me:dstr(now))):"pas encore de solde"}</small></div><div class="am ${b>0?"p":""}">${b!==null?eur(b):"—"}</div></li>`}
+  for(const x of mi){h+=`<li data-mi="${x.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${esc(x.nom)}</span><small>${x.date_echeance?"échéance "+fd(x.date_echeance):"depuis le "+fd(x.date_debut)}</small></div><div class="am p">${eur(x.montant)}</div></li>`}
+ }
  $("ca").innerHTML=h;
- if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";const ps=POSL[SELC];if(ps&&ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0);w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th><th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${p.libelle}</td><td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:6})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td><td></td><td></td><td>${eur(t)}</td></tr></table></div>`)}w.appendChild($("txb"));li.after(w)}}}
-$("ca").addEventListener("click",ev=>{const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;
+ if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";
+  const history=POSH[SELC]||[],dates=[...new Set(history.filter(p=>p.date<=me).map(p=>p.date))].sort(),curDate=dates[dates.length-1],prevDate=dates.length>1?dates[dates.length-2]:null;
+  const ps=curDate?history.filter(p=>p.date===curDate):[];
+  if(ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0),account=CPT.find(c=>c.id===SELC),crypto=/ledger|kraken/i.test(String(account?.nom||"")+" "+String(account?.produit||""));
+   const prevMap={};if(prevDate)history.filter(p=>p.date===prevDate).forEach(p=>prevMap[p.libelle]=Number(p.valeur||0));
+   w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${crypto?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${crypto?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${crypto?`<td>${prevDate?eur(history.filter(p=>p.date===prevDate).reduce((a,p)=>a+Number(p.valeur||0),0)):"—"}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`)
+  }
+  w.appendChild($("txb"));li.after(w)
+ }}
+}
+
+$("ca").addEventListener("click",ev=>{const mi=ev.target.closest("li[data-mi]");if(mi){openInvestmentDialog(MANUAL_INV.find(x=>String(x.id)===mi.dataset.mi));return}const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;
  const account=CPT.find(c=>c.id===id);
  if(account&&/per.?pierre/i.test(String(account.nom||"")+" "+String(account.produit||""))){openPerDialog(account);return}
  SELC=SELC===id?null:id;
@@ -672,8 +710,10 @@ async function impBank(buf,wb0,ws0,cid0){
  const hi=rows.findIndex(r=>r[0]==="Date");if(hi<0)throw new Error("Colonne « Date » introuvable (2e onglet attendu)");
  const num=v=>{const n=parseFloat(String(v??"").replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n};
  const L=[];
- for(const r of rows.slice(hi+1)){if(typeof r[1]!=="number")continue;
-  const date=new Date(Math.round((r[1]-25569)*864e5)).toISOString().slice(0,10),montant=Math.round((num(r[3])+num(r[4]))*100)/100;
+ for(const r of rows.slice(hi+1)){const rawDate=r[0];let date="";
+  if(typeof rawDate==="number"&&Number.isFinite(rawDate))date=new Date(Math.round((rawDate-25569)*864e5)).toISOString().slice(0,10);
+  else if(typeof rawDate==="string"){const v=rawDate.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v;else{const m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)date=m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0")}}
+  if(!date)continue;const montant=Math.round((num(r[3])+num(r[4]))*100)/100;
   if(!montant||!r[2])continue;L.push({date,libelle:String(r[2]).trim(),montant})}
  if(!L.length)throw new Error("Aucune opération trouvée");
  L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
@@ -1238,50 +1278,77 @@ $("dcaSave").onclick=async()=>{
  $("dcaDialog").close();await renderDcaCrypto();toast("Achat DCA-Crypto enregistré sur le compte Pierre");
 };
 
-// Saisie manuelle de la valorisation du PER Pierre depuis Opérations.
+// Gestion des investissements ponctuels avec échéance conservant leur historique.
+function openInvestmentDialog(item=null){
+ EDIT_INV=item||null;$("investmentTitle").textContent=item?"Modifier l’investissement":"Nouvel investissement";
+ $("investmentName").value=item?.nom||"";$("investmentAmount").value=item?Number(item.montant||0):"";
+ $("investmentStart").value=item?.date_debut||ymd(Y,M,1);$("investmentEnd").value=item?.date_echeance||"";
+ $("investmentDelete").hidden=!item;$("investmentMature").hidden=!item;$("investmentDialog").showModal();
+}
+$("addInvestment").onclick=()=>openInvestmentDialog();
+$("investmentClose").onclick=()=>$("investmentDialog").close();
+$("investmentSave").onclick=async()=>{
+ const nom=$("investmentName").value.trim(),montant=Number(String($("investmentAmount").value).replace(",",".")),date_debut=$("investmentStart").value,date_echeance=$("investmentEnd").value||null;
+ if(!nom||!date_debut||!Number.isFinite(montant)||montant<0){toast("Nom, date de début et montant valides requis");return}
+ if(date_echeance&&date_echeance<date_debut){toast("L’échéance doit être postérieure ou égale à la date de début");return}
+ const payload={nom,montant:Math.round(montant*100)/100,date_debut,date_echeance};
+ const q=EDIT_INV?SB.from("investissements").update(payload).eq("id",EDIT_INV.id):SB.from("investissements").insert(payload);
+ const {error}=await q;if(error){toast("Erreur : "+error.message+". Vérifie que la migration SQL v11 a été exécutée.");return}
+ $("investmentDialog").close();await loadManualInvestments();renderCa();toast("Investissement enregistré");
+};
+$("investmentMature").onclick=async()=>{
+ if(!EDIT_INV)return;const date=ymd(M===11?Y+1:Y,(M+1)%12,1);if(!confirm("Clôturer « "+EDIT_INV.nom+" » à partir de "+MO[M]+" "+Y+" ? L’investissement restera visible dans les mois précédents."))return;
+ const {error}=await SB.from("investissements").update({date_echeance:date}).eq("id",EDIT_INV.id);if(error){toast("Erreur : "+error.message);return}
+ $("investmentDialog").close();await loadManualInvestments();renderCa();toast("Investissement clôturé pour ce mois");
+};
+$("investmentDelete").onclick=async()=>{
+ if(!EDIT_INV||!confirm("Supprimer définitivement cet investissement et son historique ?"))return;
+ const {error}=await SB.from("investissements").delete().eq("id",EDIT_INV.id);if(error){toast("Erreur : "+error.message);return}
+ $("investmentDialog").close();await loadManualInvestments();renderCa();toast("Investissement supprimé");
+};
+
+// Saisie mensuelle du PER Pierre depuis Opérations : le versement saisi est celui du mois.
 let PER_ACCOUNT=null;
+async function perInvestedBefore(accountId,date){
+ const {data,error}=await SB.from("positions").select("date,libelle,valeur").eq("compte_id",accountId).lt("date",date);
+ if(error)throw error;return (data||[]).filter(r=>/^épargne$|^epargne$/i.test(String(r.libelle||""))).reduce((a,r)=>a+Number(r.valeur||0),0);
+}
+async function updatePerPrior(){
+ if(!PER_ACCOUNT||!$("perDate").value)return;
+ try{PER_PRIOR_INVESTED=await perInvestedBefore(PER_ACCOUNT.id,$("perDate").value);$("perCumulative").textContent="Investi avant ce mois : "+money(PER_PRIOR_INVESTED);updatePerGain()}catch(e){toast("Calcul du cumul PER : "+e.message)}
+}
 async function openPerDialog(account){
- PER_ACCOUNT=account;
- const dateEl=$("perDate");dateEl.value=dstr(now);
- $("perInvested").value="";$("perPtf").value="";
+ PER_ACCOUNT=account;const dateEl=$("perDate");dateEl.value=dstr(now);$("perInvested").value="";$("perPtf").value="";
  try{
-  const {data,error}=await SB.from("positions").select("date,libelle,valeur").eq("compte_id",account.id).order("date",{ascending:false}).limit(100);
-  if(error)throw error;
-  const rows=data||[];const latest=rows.length?rows[0].date:null;
-  if(latest){
-   const snap=rows.filter(r=>r.date===latest);
-   const invested=snap.find(r=>/^épargne$|^epargne$/i.test(String(r.libelle||"")));
-   const ptf=snap.find(r=>/^solde$/i.test(String(r.libelle||"")));
-   dateEl.value=latest;
-   if(invested)$("perInvested").value=Number(invested.valeur||0).toFixed(2);
-   if(ptf)$("perPtf").value=Number(ptf.valeur||0).toFixed(2);
-  }
+  const {data,error}=await SB.from("positions").select("date,libelle,valeur").eq("compte_id",account.id).order("date");if(error)throw error;
+  const rows=data||[],today=dateEl.value,same=rows.filter(r=>r.date===today),latestDate=rows.reduce((m,r)=>r.date>m?r.date:m,"");
+  const monthly=same.find(r=>/^épargne$|^epargne$/i.test(String(r.libelle||""))),ptfSame=same.find(r=>/^solde$/i.test(String(r.libelle||"")));
+  const latestPtf=rows.filter(r=>r.date===latestDate&&/^solde$/i.test(String(r.libelle||""))).pop();
+  if(monthly)$("perInvested").value=Number(monthly.valeur||0).toFixed(2);
+  if(ptfSame)$("perPtf").value=Number(ptfSame.valeur||0).toFixed(2);else if(latestPtf)$("perPtf").value=Number(latestPtf.valeur||0).toFixed(2);
+  await updatePerPrior();
  }catch(e){toast("Lecture de l’historique PER : "+e.message)}
  updatePerGain();$("perDialog").showModal();
 }
 function updatePerGain(){
- const invested=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",","."));
- const out=$("perGain");
- if($("perInvested").value===""||$("perPtf").value===""||!Number.isFinite(invested)||!Number.isFinite(ptf)){out.textContent="—";return}
- const gain=ptf-invested;out.textContent=money(gain);out.style.color=gain<0?"var(--late)":"var(--ok)";
+ const monthly=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",",".")),out=$("perGain");
+ if($("perInvested").value===""||$("perPtf").value===""||!Number.isFinite(monthly)||!Number.isFinite(ptf)){out.textContent="—";return}
+ const gain=ptf-(PER_PRIOR_INVESTED+monthly);out.textContent=money(gain);out.style.color=gain<0?"var(--late)":"var(--ok)";
 }
-$("perInvested").addEventListener("input",updatePerGain);$("perPtf").addEventListener("input",updatePerGain);
+$("perInvested").addEventListener("input",updatePerGain);$("perPtf").addEventListener("input",updatePerGain);$("perDate").addEventListener("change",updatePerPrior);
 $("perClose").onclick=()=>$("perDialog").close();
 $("perSave").onclick=async()=>{
  if(!PER_ACCOUNT){toast("Compte PER Pierre introuvable");return}
- const date=$("perDate").value,invested=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",","."));
- if(!date||!Number.isFinite(invested)||invested<0||!Number.isFinite(ptf)||ptf<0){toast("Date, montant investi et solde PTF valides requis");return}
- const gain=Math.round((ptf-invested)*100)/100;
- const rows=[
-  {compte_id:PER_ACCOUNT.id,date,libelle:"Solde",valeur:Math.round(ptf*100)/100},
-  {compte_id:PER_ACCOUNT.id,date,libelle:"Épargne",valeur:Math.round(invested*100)/100},
-  {compte_id:PER_ACCOUNT.id,date,libelle:"+/- Value",valeur:gain}
- ];
- const {error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});
- if(error){toast("Erreur : "+error.message);return}
+ const date=$("perDate").value,monthly=Number(String($("perInvested").value).replace(",",".")),ptf=Number(String($("perPtf").value).replace(",","."));
+ if(!date||!Number.isFinite(monthly)||monthly<0||!Number.isFinite(ptf)||ptf<0){toast("Date, versement mensuel et solde PTF valides requis");return}
+ let prior;try{prior=await perInvestedBefore(PER_ACCOUNT.id,date)}catch(e){toast("Impossible de calculer le cumul PER : "+e.message);return}
+ const cumulative=prior+monthly,gain=Math.round((ptf-cumulative)*100)/100;
+ const rows=[{compte_id:PER_ACCOUNT.id,date,libelle:"Solde",valeur:Math.round(ptf*100)/100},{compte_id:PER_ACCOUNT.id,date,libelle:"Épargne",valeur:Math.round(monthly*100)/100},{compte_id:PER_ACCOUNT.id,date,libelle:"+/- Value",valeur:gain}];
+ const {error}=await SB.from("positions").upsert(rows,{onConflict:"compte_id,date,libelle"});if(error){toast("Erreur : "+error.message);return}
  try{await putSolde(PER_ACCOUNT,date,Math.round(ptf*100)/100)}catch(e){toast("Valorisation enregistrée, mais solde non actualisé : "+e.message)}
- $("perDialog").close();await loadSo();await loadInvestments();renderCa();toast("Valorisation du PER Pierre enregistrée");
+ $("perDialog").close();await loadSo();renderCa();await loadInvestments();toast("Versement mensuel du PER Pierre enregistré");
 };
+
 async function loadProperties(){
  try{
   await ensureFinanceData();
