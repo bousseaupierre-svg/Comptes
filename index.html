@@ -507,9 +507,11 @@ $("fn").onclick=()=>{FM.m++;if(FM.m>11){FM.m=0;FM.y++}loadCF()};
 let AY=now.getFullYear(),AMo=now.getMonth(),AX=null,AOPEN={},AS=1,ZE={y:now.getFullYear(),m:now.getMonth()},ZX=null,ZMODE=1,TXB=null,CAT_CHART_SELECTED=null;
 const FROM="2026-01-01";
 const ymEnd=(y,m)=>ymd(y,m,new Date(y,m+1,0).getDate());
-async function loadTxAll(){const r=await all(()=>SB.from("transactions").select("compte_id,date,montant").order("id")),by={};
+let TXRAW=[];
+async function loadTxAll(){const r=await all(()=>SB.from("transactions").select("compte_id,date,montant,libelle,categorie,sous_categorie").order("id")),by={};TXRAW=r;
  for(const t of r)(by[t.compte_id]=by[t.compte_id]||[]).push([t.date,Number(t.montant)]);
  for(const k in by){by[k].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);let c=0;by[k]=by[k].map(x=>{c+=x[1];return[x[0],c]})}TXB=by}
+function balanceAt(c,d){let snap=null;for(const r of SOA)if(r.numero===ck(c)&&r.date<=d&&(!snap||r.date>snap.date))snap=r;if(!snap)return null;const flow=(TXRAW||[]).filter(x=>x.compte_id===c.id&&x.date>snap.date&&x.date<=d).reduce((a,x)=>a+Number(x.montant||0),0);return Math.round((Number(snap.solde||0)+flow)*100)/100}
 const cumTo=(cid,d)=>{const a=TXB&&TXB[cid];if(!a)return 0;let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m][0]<=d)lo=m+1;else hi=m}return lo?a[lo-1][1]:0};
 const balK=(k,d)=>{let b=null;for(const r of SOA)if(r.numero===k&&r.date<=d&&(!b||r.date>b.date))b=r;return b?Number(b.solde):null};
 function balC(c,d){let an=null;for(const r of SOA)if(r.numero===ck(c)&&(!an||r.date>an.date))an=r;
@@ -624,7 +626,7 @@ $("as2").onclick=()=>{AS=2;$("an1").hidden=true;$("an2").hidden=false;$("as2").c
 let SELC=null;
 async function loadSo(){try{const s=await all(()=>SB.from("soldes").select("id,numero,date,solde").order("id"));SO={};SOA=s;s.forEach(r=>{if(!SO[r.numero]||r.date>SO[r.numero].date)SO[r.numero]=r});const ps=await all(()=>SB.from("positions").select("id,compte_id,date,libelle,quantite,prix_unitaire,valeur").order("id"));POSL={};POSH={};const md={};ps.forEach(p=>{(POSH[p.compte_id]=POSH[p.compte_id]||[]).push(p);if(!md[p.compte_id]||p.date>md[p.compte_id])md[p.compte_id]=p.date});ps.forEach(p=>{if(p.date===md[p.compte_id])(POSL[p.compte_id]=POSL[p.compte_id]||[]).push(p)});PONYTX=((await SB.from("transactions").select("date,montant").eq("categorie","Fixe").eq("sous_categorie","PONY obl")).data||[]).map(x=>({d:x.date,a:Math.abs(Number(x.montant))}));PONYSUM=PONYTX.reduce((t,x)=>t+x.a,0);if(!TXB)await loadTxAll()}catch(e){}}
 function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0].toUpperCase()+MO[M].slice(1)+" "+Y;
- const me=ymEnd(Y,M),monthStart=ymd(Y,M,1),invBal=(c,d)=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYTX.filter(x=>x.d<=d).reduce((t,x)=>t+x.a,0):0),bal=c=>c.produit==="Investissement"?invBal(c,me):balC(c,me),fd=d=>d.split("-").reverse().join("/");
+ const me=ymEnd(Y,M),monthStart=ymd(Y,M,1),periodEnd=me>dstr(now)?dstr(now):me,previousDay=ymd(Y,M,0),invBal=(c,d)=>Number(c.montant_initial||0)-(c.nom==="PONY"?PONYTX.filter(x=>x.d<=d).reduce((t,x)=>t+x.a,0):0),bal=c=>c.produit==="Investissement"?invBal(c,me):balC(c,me),fd=d=>d.split("-").reverse().join("/");
  const active=CPT.filter(c=>accountActiveAt(c,me));
  const manual=MANUAL_INV.filter(x=>x.date_debut<=me&&(!x.date_echeance||x.date_echeance>me));
  let h='<li data-c="*" style="grid-template-columns:1fr auto"><div class="lb"><span>Tous les comptes</span><small>Toutes les opérations</small></div><div class="am"></div></li>';
@@ -636,27 +638,37 @@ function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0]
   for(const x of mi){h+=`<li data-mi="${x.id}" style="grid-template-columns:1fr auto"><div class="lb"><span>${esc(x.nom)}</span><small>${x.date_echeance?"échéance "+fd(x.date_echeance):"depuis le "+fd(x.date_debut)}</small></div><div class="am p">${eur(x.montant)}</div></li>`}
  }
  $("ca").innerHTML=h;
- if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";
-  const history=POSH[SELC]||[],dates=[...new Set(history.filter(p=>p.date<=me).map(p=>p.date))].sort(),curDate=dates[dates.length-1],prevDate=dates.length>1?dates[dates.length-2]:null;
-  const ps=curDate?history.filter(p=>p.date===curDate):[];
-  if(ps.length){
-   const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0),account=CPT.find(c=>c.id===SELC);
-   const accountLabel=String(account?.nom||"")+" "+String(account?.produit||"");
-   const isLife=/assurance.?vie/i.test(accountLabel);
-   const isCrypto=/ledger|kraken/i.test(accountLabel);
-   const showPrevious=!!prevDate&&(isLife||isCrypto);
-   const previousRows=prevDate?history.filter(p=>p.date===prevDate):[];
-   const previousTotal=previousRows.reduce((a,p)=>a+Number(p.valeur||0),0);
-   const prevMap={};previousRows.forEach(p=>prevMap[p.libelle]=Number(p.valeur||0));
+ if(SELC!==null&&SELC!=="*"){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";
+  const account=CPT.find(c=>String(c.id)===String(SELC)),label=String(account?.nom||"")+" "+String(account?.produit||"")+" "+String(account?.famille||"");
+  const isLife=/assurance.?vie/i.test(label),isCrypto=/ledger|kraken/i.test(label)||String(account?.famille||"").toLowerCase()==="crypto";
+  if(isLife||isCrypto){
+   const history=POSH[SELC]||[],monthDates=[...new Set(history.filter(p=>p.date>=monthStart&&p.date<=periodEnd).map(p=>p.date))].sort(),priorDates=[...new Set(history.filter(p=>p.date<monthStart).map(p=>p.date))].sort(),curDate=monthDates[monthDates.length-1]||null,prevDate=priorDates[priorDates.length-1]||null;
+   const batch=curDate?history.filter(p=>p.date===curDate):[],prior=prevDate?history.filter(p=>p.date===prevDate):[];
+   const pick=(rows,name)=>rows.find(x=>String(x.libelle||"").trim().toLowerCase()===name.toLowerCase());
+   const opening=balanceAt(account,previousDay),closingFromLedger=balanceAt(account,periodEnd);
+   const txMonth=(TXRAW||[]).filter(x=>String(x.compte_id)===String(SELC)&&x.date>=monthStart&&x.date<=periodEnd);
+   const movement=txMonth.reduce((a,x)=>a+Number(x.montant||0),0);
+   const txRows=txMonth.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>`<tr><td>${fd(x.date)}</td><td>${esc(x.libelle||x.categorie||"Mouvement")}</td><td>${eur(x.montant)}</td></tr>`).join("");
    if(isLife){
-    w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation de l’assurance-vie au ${fd(curDate)}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Contrat</th>${showPrevious?"<th>Valorisation précédente</th>":""}<th>Valorisation actuelle</th></tr><tr><td>Assurance-vie</td>${showPrevious?`<td>${eur(previousTotal)}</td>`:""}<td>${eur(t)}</td></tr></table></div>`);
+    const openingHistory=Number((pick(prior,"Solde")||{}).valeur||0),hasOpening=!!pick(prior,"Solde");
+    const apport=pick(batch,"Apport"),versement=pick(batch,"Versement périodique"),fees=pick(batch,"Frais"),pv=pick(batch,"+/- Value"),solde=pick(batch,"Solde");
+    const closing=solde?Number(solde.valeur):closingFromLedger;
+    const openingValue=hasOpening?openingHistory:opening;
+    w.insertAdjacentHTML("beforeend",`<div class="detail"><h3 style="margin:0 0 8px">${esc(account.nom)} · ${MO[M]} ${Y}</h3><table><tr><td>Valeur d’ouverture</td><td>${openingValue==null?"—":eur(openingValue)}</td></tr><tr><td>Apport</td><td>${apport?eur(apport.valeur):"—"}</td></tr><tr><td>Versement périodique</td><td>${versement?eur(versement.valeur):"—"}</td></tr><tr><td>Frais</td><td>${fees?eur(fees.valeur):"—"}</td></tr><tr><td>+/- Value</td><td>${pv?eur(pv.valeur):"—"}</td></tr><tr><td><b>Solde de clôture</b></td><td><b>${closing==null?"—":eur(closing)}</b></td></tr></table><p class="mu" style="margin:8px 0 0">${curDate?"Dernier relevé utilisé : "+fd(curDate):"Aucun relevé de valorisation enregistré pour cette période."}</p></div>`);
+    if(txRows)w.insertAdjacentHTML("beforeend",`<details style="margin:8px 0"><summary class="mu">Mouvements du compte (${txMonth.length})</summary><table class="am2"><tr><th>Date</th><th>Libellé</th><th>Montant</th></tr>${txRows}</table></details>`);
    }else{
-    w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${showPrevious?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${showPrevious?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${showPrevious?`<td>${eur(previousTotal)}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`);
+    const positionTotal=batch.length?positionValue(batch):null;
+    const closing=positionTotal!==null?positionTotal:closingFromLedger;
+    const openingValue=prior.length?positionValue(prior):opening;
+    const posRows=batch.filter(x=>!NON_ASSET_LABEL.test(String(x.libelle||""))).map(x=>`<tr><td>${esc(x.libelle)}</td><td>${Number(x.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${eur(x.valeur||0)}</td></tr>`).join("");
+    w.insertAdjacentHTML("beforeend",`<div class="detail"><h3 style="margin:0 0 8px">${esc(account.nom)} · ${MO[M]} ${Y}</h3><table><tr><td>Valeur d’ouverture</td><td>${openingValue==null?"—":eur(openingValue)}</td></tr><tr><td>Versements / mouvements nets</td><td>${txMonth.length?eur(movement):"—"}</td></tr><tr><td><b>Solde de clôture</b></td><td><b>${closing==null?"—":eur(closing)}</b></td></tr></table><p class="mu" style="margin:8px 0 0">${curDate?"Valorisation des positions au "+fd(curDate):"Aucune position enregistrée pour cette période."}</p></div>`);
+    if(posRows)w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin:8px 0"><table class="am2"><tr><th>Actif</th><th>Quantité</th><th>Valeur</th></tr>${posRows}<tr class="cur"><td>Total</td><td></td><td>${eur(positionTotal)}</td></tr></table></div>`);
+    if(txRows)w.insertAdjacentHTML("beforeend",`<details style="margin:8px 0"><summary class="mu">Détail des mouvements (${txMonth.length})</summary><table class="am2"><tr><th>Date</th><th>Libellé</th><th>Montant</th></tr>${txRows}</table></details>`);
    }
   }
   w.appendChild($("txb"));li.after(w)
- }}
-}
+ }}}
+
 
 $("ca").addEventListener("click",ev=>{const mi=ev.target.closest("li[data-mi]");if(mi){openInvestmentDialog(MANUAL_INV.find(x=>String(x.id)===mi.dataset.mi));return}const li=ev.target.closest("li[data-c]");if(!li)return;const id=li.dataset.c;
  const account=CPT.find(c=>c.id===id);
@@ -928,7 +940,7 @@ function show(on){$("lg").hidden=on;$("ap").hidden=!on}
 $("go").onclick=async()=>{$("lm").textContent="";
  const{error}=await SB.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
  if(error){$("lm").textContent="Connexion impossible : "+error.message+(error.status?" (code "+error.status+")":"");return}start()};
-async function start(){show(true);tab(1);try{await loadRef()}catch(e){toast("Erreur : "+e.message)}refreshCrypto().then(()=>loadSo().then(renderCa)).catch(()=>{});loadView()}
+async function start(){show(true);tab(9);try{await loadRef();await loadDashboard()}catch(e){toast("Erreur : "+e.message)}refreshCrypto().then(()=>loadSo().then(renderCa)).catch(()=>{});loadView()}
 let CAT=[],SOA=[],COPEN={},RD=null;
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
 const opts=a=>a.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
