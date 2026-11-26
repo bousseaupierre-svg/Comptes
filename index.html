@@ -242,6 +242,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <label>Date de valorisation<input id="perDate" type="date"></label>
  <label>Montant investi pendant ce mois (€)<input id="perInvested" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
  <label>Solde du portefeuille (PTF) (€)<input id="perPtf" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 553,92"></label>
+ <p class="mu" id="perPreviousBalance">Valorisation du mois précédent : non disponible</p>
  <p class="mu" id="perCumulative">Investi avant ce mois : 0,00 €</p>
  <div class="card" style="cursor:default"><small class="mu">Plus / moins-value estimée</small><div class="big" id="perGain" style="font-size:24px">—</div></div>
  <button type="button" class="btn" id="perSave">Enregistrer la valorisation</button>
@@ -638,9 +639,20 @@ function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0]
  if(SELC!==null){const li=$("ca").querySelector('li[data-c="'+SELC+'"]');if(li){const w=document.createElement("li");w.style.cssText="display:block;cursor:default";
   const history=POSH[SELC]||[],dates=[...new Set(history.filter(p=>p.date<=me).map(p=>p.date))].sort(),curDate=dates[dates.length-1],prevDate=dates.length>1?dates[dates.length-2]:null;
   const ps=curDate?history.filter(p=>p.date===curDate):[];
-  if(ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0),account=CPT.find(c=>c.id===SELC),crypto=/ledger|kraken/i.test(String(account?.nom||"")+" "+String(account?.produit||""));
-   const prevMap={};if(prevDate)history.filter(p=>p.date===prevDate).forEach(p=>prevMap[p.libelle]=Number(p.valeur||0));
-   w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${showPrevious?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${showPrevious?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${showPrevious?`<td>${prevDate?eur(history.filter(p=>p.date===prevDate).reduce((a,p)=>a+Number(p.valeur||0),0)):"—"}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`)
+  if(ps.length){
+   const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0),account=CPT.find(c=>c.id===SELC);
+   const accountLabel=String(account?.nom||"")+" "+String(account?.produit||"");
+   const isLife=/assurance.?vie/i.test(accountLabel);
+   const isCrypto=/ledger|kraken/i.test(accountLabel);
+   const showPrevious=!!prevDate&&(isLife||isCrypto);
+   const previousRows=prevDate?history.filter(p=>p.date===prevDate):[];
+   const previousTotal=previousRows.reduce((a,p)=>a+Number(p.valeur||0),0);
+   const prevMap={};previousRows.forEach(p=>prevMap[p.libelle]=Number(p.valeur||0));
+   if(isLife){
+    w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation de l’assurance-vie au ${fd(curDate)}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Contrat</th>${showPrevious?"<th>Valorisation précédente</th>":""}<th>Valorisation actuelle</th></tr><tr><td>Assurance-vie</td>${showPrevious?`<td>${eur(previousTotal)}</td>`:""}<td>${eur(t)}</td></tr></table></div>`);
+   }else{
+    w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${showPrevious?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${showPrevious?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${showPrevious?`<td>${eur(previousTotal)}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`);
+   }
   }
   w.appendChild($("txb"));li.after(w)
  }}
@@ -1344,6 +1356,8 @@ async function openPerDialog(account){
   const {data,error}=await SB.from("positions").select("date,libelle,valeur").eq("compte_id",account.id).order("date");if(error)throw error;
   const rows=data||[],today=dateEl.value,same=rows.filter(r=>r.date===today),latestDate=rows.reduce((m,r)=>r.date>m?r.date:m,"");
   const monthly=same.find(r=>/^épargne$|^epargne$/i.test(String(r.libelle||""))),ptfSame=same.find(r=>/^solde$/i.test(String(r.libelle||"")));
+  const previousPtf=rows.filter(r=>r.date<today&&/^solde$/i.test(String(r.libelle||""))).sort((a,b)=>b.date.localeCompare(a.date))[0];
+  $("perPreviousBalance").textContent=previousPtf?"Valorisation du mois précédent ("+previousPtf.date.split("-").reverse().join("/")+") : "+money(Number(previousPtf.valeur||0)):"Valorisation du mois précédent : non disponible";
   const latestPtf=rows.filter(r=>r.date===latestDate&&/^solde$/i.test(String(r.libelle||""))).pop();
   if(monthly)$("perInvested").value=Number(monthly.valeur||0).toFixed(2);
   if(ptfSame)$("perPtf").value=Number(ptfSame.valeur||0).toFixed(2);else if(latestPtf)$("perPtf").value=Number(latestPtf.valeur||0).toFixed(2);
