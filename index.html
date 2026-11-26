@@ -119,7 +119,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v11 du 26/11 · historique des investissements, PER mensuel et import par date</p>
+  <div id="log"></div><p class="mu" id="ver">Version v13 du 26/11 · DCA dédié, historique assurance-vie et affichage simplifié</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -173,24 +173,27 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <p class="mu">L’historique est recalculé à partir des soldes, positions et tableaux d’amortissement disponibles. Les valeurs immobilières restent aux dernières estimations saisies. Pour le PTZ et La Bernerie, faute d’historique d’amortissement complet, le dernier capital connu est maintenu constant dans les mois antérieurs.</p>
  </div>
  <div id="v11" hidden>
-  <h2>Performance des placements</h2><p class="mu">Assurance-vie, PEA, Trade Republic et Kraken. Les performances sont calculées à partir des valorisations enregistrées et des flux détectés.</p>
+  <h2>Placements</h2>
+  <div class="subs"><button id="plSummaryTab" class="on">Synthèse</button><button id="plDcaTab">DCA</button></div>
+  <div id="plSummaryPane">
+  <p class="mu">Suivi des valorisations de tes placements et de leur évolution.</p>
   <div class="kgrid">
    <div class="kpi"><div class="l">Valeur actuelle</div><div class="v" id="invtotal">—</div></div>
    <div class="kpi"><div class="l">Variation depuis valorisation précédente</div><div class="v" id="invchange">—</div></div>
    <div class="kpi"><div class="l">Performance estimée</div><div class="v" id="invperf">—</div><div class="l">Après neutralisation des flux identifiés</div></div>
   </div>
-  <div class="card" style="cursor:default;margin-top:14px">
-   <h3>Achats DCA-Crypto (BTC)</h3>
-   <p class="mu">Saisis chaque achat hebdomadaire. L’opération est enregistrée dans Opérations avec la catégorie Placements › DCA-Crypto. La quantité et le prix du BTC sont conservés dans la note.</p>
+  <div id="investmentRows"></div>
+  </div>
+  <div id="plDcaPane" hidden>
+   <p class="mu">Historique des achats DCA-Crypto (BTC). Les achats sont enregistrés dans Opérations sur le compte Pierre.</p>
    <button type="button" class="btn" id="dcaOpen">+ Ajouter un achat DCA-Crypto</button>
-   <p class="mu">Le compte débité est automatiquement « Pierre » ; aucun autre compte ne peut être sélectionné.</p>
    <div id="dcaSummary" style="margin-top:12px"></div>
+   <div id="dcaChart" class="card" style="cursor:default"></div>
    <div id="dcaHistory"></div>
   </div>
-  <div id="investmentRows"></div>
   <p class="mu">Pour Trade Republic, les titres sont séparés des espèces : les espèces sont identifiées dans les positions (EUR / liquidités) ou calculées par différence entre le solde du compte et la valeur des titres.</p>
  </div>
- <div id="v12" hidden>
+ <div id="v13" hidden>
   <h2>Immobiliers</h2><div class="big" id="propertyTotal">—</div><div class="mu">Valeur nette de tes quotes-parts, après déduction des capitaux restant dus.</div>
   <div id="propertyList"></div>
   <p class="mu">Saint-Denis et Les Mureaux reprennent automatiquement les prêts de l’onglet Prêts. La dette du PTZ dispose d’un solde de référence au 21/11/2026 si aucun solde plus récent n’est disponible.</p>
@@ -423,24 +426,12 @@ function settingsSub(n){[1,2,3].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).cla
 $("t9").onclick=()=>{tab(9);loadDashboard()};
 $("t10").onclick=()=>{tab(10);loadWealth()};
 $("t11").onclick=()=>{tab(11);loadInvestments()};
+function placementSub(which){const d=which==="dca";$("plSummaryPane").hidden=d;$("plDcaPane").hidden=!d;$("plSummaryTab").classList.toggle("on",!d);$("plDcaTab").classList.toggle("on",d);if(d)renderDcaCrypto()}
+$("plSummaryTab").onclick=()=>placementSub("summary");$("plDcaTab").onclick=()=>placementSub("dca");
 $("t12").onclick=()=>{tab(12);loadProperties()};
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
 $("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);AS===2?loadCatAn():loadAn()};
 const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
-const SEED=[
-{id:"frais",libelle:"Frais bancaires",montant:-9.3,jour:1,mots_cles:["COTIS EUC"]},
-{id:"navigo",libelle:"Navigo",montant:-90.8,jour:3,mois:[1,2,3,4,5,6,7,8,10,11,12],mots_cles:["NAVIGO"]},
-{id:"assp",libelle:"Assurance prêt",montant:-16.49,jour:5,mots_cles:["KEREIS"]},
-{id:"asst",libelle:"Assurance trimestrielle",montant:-50.73,jour:5,mois:[2,5,8,11],mots_cles:["MULTI IMPACT"]},
-{id:"copro",libelle:"Charge copropriété",montant:-300,jour:5,variable:true,mots_cles:["MATERA"]},
-{id:"pret",libelle:"Prêt immobilier",montant:-775,jour:7,mots_cles:["CAP+IN"]},
-{id:"ptz",libelle:"PTZ",montant:-333.33,jour:7,mots_cles:["PRET CAP 36044"]},
-{id:"loyer",libelle:"Loyer Saint-Denis",montant:1410,jour:8,variable:true,mots_cles:["ADHOC GESTION"]},
-{id:"fonc",libelle:"Taxe foncière",montant:-206,jour:15,mois:[1,2,3,4,5,6,7,8,9,10],mots_cles:["DIRECTION GENERALE","DGFIP"]},
-{id:"tel",libelle:"Téléphone",montant:-17.99,jour:19,mots_cles:["ORANGE"]},
-{id:"sal",libelle:"Salaire",montant:4730,jour:25,variable:true,mots_cles:["KLESIA"]},
-{id:"trade",libelle:"Trade Republic",montant:-105,jour:30,mots_cles:["TRADEREPUBLIC"]},
-{id:"btc",libelle:"Achat crypto",montant:-30,jour_semaine:3,mots_cles:["KRAKEN"]}];
 let CF=[],FT=[],PT={},FO=[];const FM={y:now.getFullYear(),m:now.getMonth()};
 function occF(y,m,cf){const o=[],dim=new Date(y,m+1,0).getDate();
  for(const c of cf){if(c.mois&&!c.mois.includes(m+1))continue;
@@ -475,7 +466,7 @@ async function syncCF(){try{
  if(nw)toast(nw+" nouvelle(s) charge(s) fixe(s) détectée(s)")}catch(e){}}
 async function loadCF(){try{
  let{data,error}=await SB.from("charges_fixes").select("*");if(error)throw error;
- if(!data.length){const r=await SB.from("charges_fixes").insert(SEED.map(c=>({variable:false,compte_id:(byNom("Pierre")||{}).id||null,...c})));if(r.error)throw r.error}
+ // Les charges fixes sont chargées exclusivement depuis Supabase. Aucun montant personnel par défaut dans le HTML.
  if(!SYN){SYN=true;await syncCF()}
  data=(await SB.from("charges_fixes").select("*").eq("actif",true)).data;
  CF=data;const{y,m}=FM;
@@ -649,7 +640,7 @@ function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0]
   const ps=curDate?history.filter(p=>p.date===curDate):[];
   if(ps.length){const t=ps.reduce((a,p)=>a+Number(p.valeur||0),0),account=CPT.find(c=>c.id===SELC),crypto=/ledger|kraken/i.test(String(account?.nom||"")+" "+String(account?.produit||""));
    const prevMap={};if(prevDate)history.filter(p=>p.date===prevDate).forEach(p=>prevMap[p.libelle]=Number(p.valeur||0));
-   w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${crypto?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${crypto?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${crypto?`<td>${prevDate?eur(history.filter(p=>p.date===prevDate).reduce((a,p)=>a+Number(p.valeur||0),0)):"—"}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`)
+   w.insertAdjacentHTML("beforeend",`<div class="mu" style="margin-bottom:6px">Valorisation du ${fd(curDate)}${prevDate?" · comparaison avec le "+fd(prevDate):""}</div><div style="overflow-x:auto;margin-bottom:10px"><table class="am2"><tr><th>Support</th>${showPrevious?"<th>Valeur mois précédent</th>":""}<th>Quantité</th><th>Cours</th><th>Valeur</th></tr>${ps.sort((x,y)=>y.valeur-x.valeur).map(p=>`<tr><td>${esc(p.libelle)}</td>${showPrevious?`<td>${prevMap[p.libelle]===undefined?"—":eur(prevMap[p.libelle])}</td>`:""}<td>${Number(p.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${p.prix_unitaire?eur(p.prix_unitaire):"—"}</td><td>${eur(p.valeur||0)}</td></tr>`).join("")}<tr class="cur"><td>Total</td>${showPrevious?`<td>${prevDate?eur(history.filter(p=>p.date===prevDate).reduce((a,p)=>a+Number(p.valeur||0),0)):"—"}</td>`:""}<td></td><td></td><td>${eur(t)}</td></tr></table></div>`)
   }
   w.appendChild($("txb"));li.after(w)
  }}
@@ -751,6 +742,18 @@ async function impBourso(R,h){
   if(!last||d>last.d)last={d,s:num2(r[iS2])}}
  const msg=await pushLines(c.id,L);if(last)await putSolde(c,last.d,last.s);
  return c.nom+" : "+msg}
+async function impAssuranceVieHistory(R,h){
+ const ix=n=>h.indexOf(n), c=CPT.find(x=>/assurance.?vie/i.test(String(x.produit||"")+" "+String(x.nom||""))&&/pierre/i.test(String(x.nom||""))) || CPT.find(x=>/assurance.?vie/i.test(String(x.produit||"")));
+ if(!c)throw new Error("Contrat d’assurance-vie introuvable dans les comptes Supabase");
+ const map=[["apport","Apport"],["versement_periodique","Versement périodique"],["frais","Frais"],["plus_ou_moins_value","+/- Value"],["solde","Solde"]], rows=[];let last=null;
+ for(const r of R.slice(1)){const date=String(r[ix("date")]||"").trim();if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
+  for(const [col,label] of map){const i=ix(col);if(i<0||r[i]===undefined||r[i]===null||String(r[i]).trim()==="")continue;const v=num2(r[i]);rows.push({compte_id:c.id,date,libelle:label,valeur:v,quantite:0});if(label==="Solde"&&(!last||date>last.date))last={date,solde:v}}
+ }
+ if(!rows.length)throw new Error("Aucune ligne d’historique valide dans le CSV");
+ for(let i=0;i<rows.length;i+=300){const {error}=await SB.from("positions").upsert(rows.slice(i,i+300),{onConflict:"compte_id,date,libelle"});if(error)throw error}
+ if(last)await putSolde(c,last.date,last.solde);
+ return c.nom+" : "+rows.length+" valeurs historiques importées";
+}
 async function impPortef(R,name){
  const m=name.match(/(\d{5,})/);let c=m&&byNum(m[1]);
  if(!c){const av=CPT.filter(x=>x.produit==="Assurance vie");
@@ -849,6 +852,7 @@ async function impImpots(R,h){
 async function importCsv(txt,name){
  const first=txt.replace(/^\ufeff/,"").split(/\r?\n/)[0],sep=first.split(";").length>first.split(",").length?";":",";
  const R=csv(txt,sep),h=R[0].map(s=>s.trim());
+ if(["date","apport","versement_periodique","frais","plus_ou_moins_value","solde"].every(k=>h.includes(k)))return impAssuranceVieHistory(R,h);
  if(h.includes("Date Opération")&&h.includes("Numéro Compte"))return impBourso(R,h);
  if(h.includes("Libellé Support")&&h.includes("ISIN"))return impPortef(R,name);
  if(h.includes("cle_doublon")&&h.includes("compte"))return impTxCsv(R,h);
@@ -1236,6 +1240,14 @@ async function loadInvestments(){
    const performance=previous==null?null:(current-previous-netFlows);
    total+=current;if(change!=null)delta+=change;if(performance!=null)perf+=performance;
    const isTR=/trade.?republic/i.test((c.nom||"")+" "+(c.produit||""));
+   const isAV=/assurance.?vie/i.test((c.nom||"")+" "+(c.produit||""));
+   if(isAV){
+    const ordered=dates.slice().reverse();
+    const history=ordered.map(d=>{const batch=snap(d),pick=k=>batch.find(x=>String(x.libelle||"").toLowerCase()===k.toLowerCase());const solde=pick("Solde"),apport=pick("Apport"),versement=pick("Versement périodique"),frais=pick("Frais"),pv=pick("+/- Value");return `<tr><td>${d.split("-").reverse().join("/")}</td><td>${apport?money(apport.valeur):"—"}</td><td>${versement?money(versement.valeur):"—"}</td><td>${frais?money(frais.valeur):"—"}</td><td>${pv?money(pv.valeur):"—"}</td><td><b>${solde?money(solde.valeur):"—"}</b></td></tr>`}).join("");
+    const batch=last?snap(last):[],pick=k=>batch.find(x=>String(x.libelle||"").toLowerCase()===k.toLowerCase());
+    out.push(`<div class="card" style="cursor:default"><h3>${esc(c.nom)}</h3><div class="kgrid"><div class="kpi"><div class="l">Valeur du contrat</div><div class="v">${money(current)}</div></div><div class="kpi"><div class="l">Versement périodique</div><div class="v">${pick("Versement périodique")?money(pick("Versement périodique").valeur):"—"}</div></div><div class="kpi"><div class="l">Frais du mois</div><div class="v">${pick("Frais")?money(pick("Frais").valeur):"—"}</div></div><div class="kpi"><div class="l">+/- Value du mois</div><div class="v">${pick("+/- Value")?money(pick("+/- Value").valeur):"—"}</div></div></div><p class="mu">Dernière valorisation : ${last||"aucune"}. Les supports du contrat ne sont pas détaillés ici.</p><details><summary class="mu" style="cursor:pointer">Historique du contrat (${dates.length} relevés)</summary><div style="overflow-x:auto;margin-top:8px"><table class="am2"><tr><th>Date</th><th>Apport</th><th>Versement</th><th>Frais</th><th>+/- Value</th><th>Solde</th></tr>${history}</table></div></details></div>`);
+    total+=current; if(change!=null)delta+=change; continue;
+   }
    const hist=dates.slice(-18).reverse().map(d=>{
     const batch=snap(d),sum=positionValue(batch);
     return `<tr><td>${d.split("-").reverse().join("/")}</td><td>${batch.map(x=>esc(x.libelle)+" : "+money(x.valeur)).join("<br>")}</td><td>${money(sum)}</td></tr>`;
@@ -1252,13 +1264,22 @@ function pierreCurrentAccount(){
 }
 async function renderDcaCrypto(){
  const dateEl=$("dcaDate");if(dateEl&&!dateEl.value)dateEl.value=dstr(now);
- const q=SB.from("transactions").select("id,date,libelle,montant,note,compte_id").eq("categorie","Placements").eq("sous_categorie","DCA-Crypto").order("date",{ascending:false}).limit(300);
+ const q=SB.from("transactions").select("id,date,libelle,montant,note,compte_id").eq("categorie","Placements").eq("sous_categorie","DCA-Crypto").order("date",{ascending:false}).limit(1000);
  const {data,error}=await q;if(error)throw error;
- const list=data||[];let btc=0,invested=0;
- for(const x of list){const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i);if(m)btc+=num2(m[1]);invested+=Math.abs(Number(x.montant||0));}
- $("dcaSummary").innerHTML=`<div class="kgrid"><div class="kpi"><div class="l">Total investi enregistré</div><div class="v">${money(invested)}</div></div><div class="kpi"><div class="l">BTC renseignés dans les achats</div><div class="v">${btc.toLocaleString("fr-FR",{maximumFractionDigits:8})} BTC</div></div></div>`;
+ const list=data||[];let btc=0,invested=0;const monthly={};
+ for(const x of list){const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i),qty=m?num2(m[1]):0;btc+=qty;invested+=Math.abs(Number(x.montant||0));const key=x.date.slice(0,7);if(!monthly[key])monthly[key]={invested:0,qty:0};monthly[key].invested+=Math.abs(Number(x.montant||0));monthly[key].qty+=qty;}
+ let price=null;
+ const cryptoAccounts=CPT.filter(c=>c.famille==="Crypto");
+ for(const c of cryptoAccounts){const p=await all(()=>SB.from("positions").select("date,libelle,prix_unitaire").eq("compte_id",c.id).order("date",{ascending:false}).limit(100));const r=p.find(x=>/^BTC$|^XBT$/i.test(String(x.libelle||""))&&Number(x.prix_unitaire)>0);if(r){price=Number(r.prix_unitaire);break}}
+ const value=price==null?null:btc*price, gain=value==null?null:value-invested, pct=invested?gain/invested*100:null;
+ $("dcaSummary").innerHTML=`<div class="kgrid"><div class="kpi"><div class="l">Total investi</div><div class="v">${money(invested)}</div></div><div class="kpi"><div class="l">BTC achetés</div><div class="v">${btc.toLocaleString("fr-FR",{maximumFractionDigits:8})} BTC</div></div><div class="kpi"><div class="l">Valorisation estimée</div><div class="v">${value==null?"Cours BTC indisponible":money(value)}</div></div><div class="kpi"><div class="l">+/- Value estimée</div><div class="v" style="color:${gain!=null&&gain<0?"var(--late)":"var(--ok)"}">${gain==null?"—":money(gain)+" ("+pct.toLocaleString("fr-FR",{maximumFractionDigits:2})+" %)"}</div></div></div><p class="mu">${price==null?"Actualise les cours des cryptos dans Import pour afficher la valorisation.":"Valorisation indicative calculée à partir du total de BTC enregistré dans les achats et du dernier cours BTC disponible ("+money(price)+"). Elle ne tient pas compte d’éventuelles ventes ou transferts."}</p>`;
+ const keys=Object.keys(monthly).sort();let cumI=0,cumQ=0;const points=keys.map(k=>{cumI+=monthly[k].invested;cumQ+=monthly[k].qty;return {k,invested:cumI,value:price==null?null:cumQ*price}});
+ if(points.length){const max=Math.max(1,...points.flatMap(p=>[p.invested,p.value||0]));const w=620,h=210,pad=28,xy=(v,i)=>[pad+i*(w-2*pad)/Math.max(1,points.length-1),h-pad-(v/max)*(h-2*pad)];const line=key=>points.map((p,i)=>xy(p[key]||0,i).join(",")).join(" ");
+ $("dcaChart").innerHTML=`<h3>Évolution cumulée</h3><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Graphique des montants investis cumulés et de la valorisation indicative"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--ln)"/><polyline fill="none" stroke="#0f8b8d" stroke-width="3" points="${line("invested")}"/>${price==null?"":`<polyline fill="none" stroke="#d97757" stroke-width="3" points="${line("value")}"/>`}<text x="${pad}" y="16" fill="var(--mu)" font-size="11">${money(max)}</text><text x="${pad}" y="${h-5}" fill="var(--mu)" font-size="11">${keys[0]}</text><text x="${w-pad}" y="${h-5}" text-anchor="end" fill="var(--mu)" font-size="11">${keys[keys.length-1]}</text></svg><div class="chart-legend"><span><i class="chart-dot" style="background:#0f8b8d"></i>Montant investi cumulé</span>${price==null?"":'<span><i class="chart-dot" style="background:#d97757"></i>Valeur estimée au cours actuel</span>'}</div>`;
+ }else $("dcaChart").innerHTML='<h3>Évolution cumulée</h3><p class="mu">Le graphique apparaîtra après le premier achat DCA.</p>';
  $("dcaHistory").innerHTML=list.length?`<h3 style="margin:14px 0 4px">Historique des achats</h3><div style="overflow-x:auto"><table class="am2"><tr><th>Date</th><th>Compte / libellé</th><th>Quantité BTC</th><th>Prix BTC</th><th>Montant</th></tr>${list.map(x=>{const m=String(x.note||"").match(/BTC\s*=\s*([0-9.,]+)/i),p=String(x.note||"").match(/PRIX\s*=\s*([0-9.,]+)/i);return `<tr><td>${x.date.split("-").reverse().join("/")}</td><td>${esc(CN(x.compte_id)||"")} · ${esc(x.libelle)}</td><td>${m?num2(m[1]).toLocaleString("fr-FR",{maximumFractionDigits:8}):"—"}</td><td>${p?money(num2(p[1])):"—"}</td><td>${money(Math.abs(Number(x.montant||0)))}</td></tr>`}).join("")}</table></div>`:'<p class="mu">Aucun achat DCA-Crypto enregistré pour le moment.</p>';
 }
+
 $("dcaOpen").onclick=()=>{
  const dateEl=$("dcaDate");dateEl.value=dstr(now);
  $("dcaAmount").value="";$("dcaQty").value="";$("dcaPrice").value="";
