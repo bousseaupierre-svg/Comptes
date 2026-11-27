@@ -119,7 +119,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v25 du 27/11 · navigation immobiliers corrigée et gestion des doublons</p>
+  <div id="log"></div><p class="mu" id="ver">Version v26 du 27/11 · doublons triés du plus récent au plus ancien</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -456,7 +456,8 @@ async function scanDuplicates(){
    for(const r of list){if(!cluster.length||((dupDateMs(r.date)-dupDateMs(cluster[0].date))/86400000)<=17)cluster.push(r);else{if(cluster.length>1)groups.push(cluster);cluster=[r]}}
    if(cluster.length>1)groups.push(cluster);
   }
-  groups.sort((a,b)=>a[0].date.localeCompare(b[0].date));
+  groups.forEach(g=>g.sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id))));
+  groups.sort((a,b)=>b[0].date.localeCompare(a[0].date));
   if(!groups.length){status.textContent=rows.length+" opérations analysées : aucun groupe suspect détecté.";return}
   status.textContent=rows.length+" opérations analysées · "+groups.length+" groupes à vérifier · "+groups.reduce((n,g)=>n+g.length-1,0)+" doublon(s) potentiel(s).";
   out.innerHTML=groups.map((g,i)=>{
