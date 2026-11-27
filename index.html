@@ -204,8 +204,9 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
 </section>
 </main>
 <dialog id="sh">
- <h2 id="sl" style="font-size:15px;word-break:break-word"></h2><p class="mu" id="sa"></p>
+ <h2 id="sl" tabindex="-1" style="font-size:15px;word-break:break-word"></h2><p class="mu" id="sa"></p>
  <label>Catégorie<select id="sc"></select></label>
+ <label>Rechercher une sous-catégorie<input id="subSearch" type="search" placeholder="Ex. cadeau" autocomplete="off"></label>
  <label>Sous-catégorie<select id="su"></select></label>
  <button type="button" class="btn alt" id="addSubOp">+ Ajouter une sous-catégorie</button>
  <datalist id="dc"></datalist><datalist id="ds"></datalist>
@@ -360,7 +361,7 @@ function fillCpt(){
  if(!$("cpi").value&&CPT.length)$("cpi").value=(CPT.find(c=>c.nom==="Pierre")||CPT[0]).id}
 async function loadRef(){SYN=false;
  const cr=await SB.from("comptes").select("*").order("ordre");CPT=cr.data||[];fillCpt();await loadSo();await loadManualInvestments();renderCa();
- REF=await all(()=>SB.from("transactions").select("id,libelle,categorie,sous_categorie,statut_cat").order("id"));
+ REF=await all(()=>SB.from("transactions").select("id,date,libelle,categorie,sous_categorie,statut_cat").order("id"));
  RULES=(await all(()=>SB.from("regles").select("*").order("id"))).sort((a,b)=>b.mot_cle.length-a.mot_cle.length);
  const m=new Map();
  for(const r of REF){if(!r.categorie||r.statut_cat==="suggeree")continue;const k=norm(r.libelle);if(!k)continue;
@@ -399,11 +400,12 @@ $("ls").addEventListener("click",async ev=>{
  if(ok){const r=ROWS[ok.dataset.ok];await upd([r.id],{statut_cat:"manuelle"});await loadRef();loadView();return}
  const li=ev.target.closest("li");if(!li)return;cur=ROWS[li.dataset.i];
  $("sl").textContent=cur.libelle;$("sa").textContent=cur.date+" · "+eur(cur.montant);
- fillSel($("sc"),CATNAMES,cur.categorie||"");fillSel($("su"),subsFor(cur.categorie||""),cur.sous_categorie||"");
+ fillSel($("sc"),CATNAMES,cur.categorie||"");$("subSearch").value="";fillSubOptions(cur.sous_categorie||"");
  const k=norm(cur.libelle),n=REF.filter(r=>r.id!==cur.id&&r.statut_cat!=="manuelle"&&norm(r.libelle)===k).length;
- $("fx1").checked=false;$("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal()});
-function subs(){fillSel($("su"),subsFor($("sc").value),"")}
-$("sc").addEventListener("input",subs);
+ $("fx1").checked=false;$("sn").textContent=n;$("sim").checked=false;$("ru").checked=false;$("rk").value=k;$("sh").showModal();$("sl").focus({preventScroll:true})});
+function subs(){fillSubOptions("")}
+$("sc").addEventListener("change",subs);
+$("subSearch").addEventListener("input",()=>fillSubOptions($("su").value));
 $("addSubOp").onclick=async()=>{
  const c=$("sc").value.trim();
  if(!c){toast("Choisissez d’abord une catégorie");return}
@@ -992,7 +994,16 @@ const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").r
 const opts=a=>a.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
 let CATNAMES=[];
 const fillSel=(el,list,v)=>{const a=[...list];if(v&&!a.includes(v))a.push(v);el.innerHTML='<option value="">—</option>'+opts(a);el.value=v||""};
-function subsFor(c){return [...new Set(CAT.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))].sort((a,b)=>a.localeCompare(b,"fr"))}
+function subsFor(c){
+ const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);const limit=cutoff.toISOString().slice(0,10);
+ const lastUse=new Map();for(const r of REF){if(r.categorie!==c||!r.sous_categorie||!r.date)continue;const k=r.sous_categorie;if(!lastUse.has(k)||r.date>lastUse.get(k))lastUse.set(k,r.date)}
+ return [...new Set(CAT.filter(r=>r.categorie===c&&r.sous_categorie).map(r=>r.sous_categorie))]
+  .filter(name=>!lastUse.has(name)||lastUse.get(name)>=limit).sort((a,b)=>a.localeCompare(b,"fr"))
+}
+function fillSubOptions(selected){
+ const q=norm($("subSearch").value||"");let list=subsFor($("sc").value).filter(x=>!q||norm(x).includes(q));
+ fillSel($("su"),list,selected||"");
+}
 async function syncCat(){
  try{CAT=await all(()=>SB.from("categories").select("*").order("id"));
   const have=new Set(CAT.map(c=>c.categorie+"\u0001"+c.sous_categorie)),miss=new Map();
