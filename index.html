@@ -119,7 +119,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v17 du 27/11 · historiques crypto mensuels figés et gestion des quantités</p>
+  <div id="log"></div><p class="mu" id="ver">Version v18 du 27/11 · quantités crypto historiques réaffichées</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -672,7 +672,7 @@ function renderCa(){$("park").appendChild($("txb"));$("mt").textContent=MO[M][0]
     const positionTotal=batch.length?positionValue(batch):null;
     const closing=positionTotal!==null?positionTotal:closingFromLedger;
     const openingValue=prior.length?positionValue(prior):opening;
-    const posRows=batch.filter(x=>!NON_ASSET_LABEL.test(String(x.libelle||""))&&Number(x.quantite||0)!==0).map(x=>`<tr><td>${esc(x.libelle)}</td><td>${Number(x.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${eur(x.valeur||0)}</td></tr>`).join("");
+    const posRows=batch.filter(x=>!NON_ASSET_LABEL.test(String(x.libelle||""))).map(x=>`<tr><td>${esc(x.libelle)}</td><td>${Number(x.quantite||0).toLocaleString("fr-FR",{maximumFractionDigits:8})}</td><td>${eur(x.valeur||0)}</td></tr>`).join("");
     w.insertAdjacentHTML("beforeend",`<div class="detail"><h3 style="margin:0 0 8px">${esc(account.nom)} · ${MO[M]} ${Y}</h3><table><tr><td>Valeur d’ouverture</td><td>${openingValue==null?"—":eur(openingValue)}</td></tr><tr><td>Versements / mouvements nets</td><td>${txMonth.length?eur(movement):"—"}</td></tr><tr><td><b>Solde de clôture</b></td><td><b>${closing==null?"—":eur(closing)}</b></td></tr></table><p class="mu" style="margin:8px 0 0">${curDate?"Valorisation des positions au "+fd(curDate):"Aucune position enregistrée pour cette période."}</p></div>`);
     if(posRows)w.insertAdjacentHTML("beforeend",`<div style="overflow-x:auto;margin:8px 0"><table class="am2"><tr><th>Actif</th><th>Quantité</th><th>Valeur</th></tr>${posRows}<tr class="cur"><td>Total</td><td></td><td>${eur(positionTotal)}</td></tr></table></div>`);
     if(isCrypto)w.insertAdjacentHTML("beforeend",`<button type="button" class="btn alt" id="cryptoManage" style="margin:10px 0">Gérer les cryptos et les quantités</button>`);
