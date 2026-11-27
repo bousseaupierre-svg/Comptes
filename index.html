@@ -34,7 +34,7 @@ input,select{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(
 #v1>.nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:4;background:var(--bg);padding:8px 0;margin:0}
 .nav button{width:40px;height:40px;border:1px solid var(--ln);border-radius:50%;background:var(--sf);color:var(--ink);font-size:20px;cursor:pointer}
 .chips{display:flex;gap:6px;margin-bottom:6px}
-.subs{display:flex;gap:6px;margin:10px 0}.subs button{flex:1;padding:9px;border:1px solid var(--ln);border-radius:10px;background:transparent;color:var(--ink);font:500 14px inherit;font-family:inherit;cursor:pointer}.subs button.on{background:var(--ink);color:var(--bg)}
+.subs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.subs button{min-width:calc(50% - 6px)}.subs button{flex:1;padding:9px;border:1px solid var(--ln);border-radius:10px;background:transparent;color:var(--ink);font:500 14px inherit;font-family:inherit;cursor:pointer}.subs button.on{background:var(--ink);color:var(--bg)}
 .chips button{padding:6px 12px;border:1px solid var(--ln);border-radius:16px;background:transparent;color:var(--ink);font:500 13px inherit;font-family:inherit;cursor:pointer}
 .chips button.on{background:var(--ink);color:var(--bg)}
 ul{list-style:none;margin:0;padding:0}
@@ -119,7 +119,7 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   <button class="btn" id="backupExport">Exporter toute la base (.json)</button>
   <label class="btn alt" for="backupFile">Importer une sauvegarde (.json)</label><input id="backupFile" type="file" accept=".json,application/json" hidden>
   <p class="mu">L’import fusionne les données : il ne supprime aucune ligne existante. Conservez vos fichiers de sauvegarde dans un endroit sûr.</p>
-  <div id="log"></div><p class="mu" id="ver">Version v19 du 27/11 · historique Kraken indépendant des opérations Pierre</p>
+  <div id="log"></div><p class="mu" id="ver">Version v25 du 27/11 · navigation immobiliers corrigée et gestion des doublons</p>
  </div>
  <div id="v4" hidden>
   <div class="nav"><button id="fp" aria-label="Mois précédent">‹</button><h2 id="fm"></h2><button id="fn" aria-label="Mois suivant">›</button></div>
@@ -436,9 +436,9 @@ document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>{F=b.dataset
 $("cpf").onchange=()=>loadView();
 $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}renderCa();loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
-function tab(n){[1,2,4,5,6,7,8,9,10,11,12].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;if($("t"+v))$("t"+v).classList.toggle("on",v===n)})}
+function tab(n){[1,2,4,5,6,7,8,9,10,11,13].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;const t=$("t"+(v===13?12:v));if(t)t.classList.toggle("on",v===n)})}
 $("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=async()=>{tab(7);try{await loadRef();renderCat();renderOwnerSettings()}catch(e){toast("Erreur de chargement des paramètres : "+e.message)}};$("t8").onclick=()=>{tab(8);loadImp()};
-$("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};$("st4").onclick=()=>settingsSub(4);
+$("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};$("st4").onclick=()=>{settingsSub(4);scanDuplicates()};
 function settingsSub(n){[1,2,3,4].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).classList.toggle("on",i===n)})}
 const dupNorm=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
 const dupDateMs=s=>{const d=new Date(String(s||"")+"T12:00:00");return isNaN(d)?NaN:d.getTime()};
@@ -477,7 +477,7 @@ $("t10").onclick=()=>{tab(10);loadWealth()};
 $("t11").onclick=()=>{tab(11);loadInvestments()};
 function placementSub(which){const d=which==="dca";$("plSummaryPane").hidden=d;$("plDcaPane").hidden=!d;$("plSummaryTab").classList.toggle("on",!d);$("plDcaTab").classList.toggle("on",d);if(d)renderDcaCrypto()}
 $("plSummaryTab").onclick=()=>placementSub("summary");$("plDcaTab").onclick=()=>placementSub("dca");
-$("t12").onclick=()=>{tab(12);loadProperties()};
+$("t12").onclick=()=>{tab(13);loadProperties()};
 $("t1").onclick=()=>{tab(1);loadView()};$("t2").onclick=()=>tab(2);
 $("t4").onclick=()=>{tab(4);loadCF()};$("t5").onclick=()=>{tab(5);AS===2?loadCatAn():loadAn()};
 const WD=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."],dstr=d=>ymd(d.getFullYear(),d.getMonth(),d.getDate());
@@ -1511,7 +1511,10 @@ $("perSave").onclick=async()=>{
 
 async function loadProperties(){
  try{
-  await ensureFinanceData();
+  // Les biens restent visibles même si un tableau de prêts ou de soldes est indisponible.
+  try{if(!CPT.length)await loadRef()}catch(e){console.warn("Chargement des comptes pour les biens :",e)}
+  try{if(!PR.length)await loadPr()}catch(e){console.warn("Chargement des prêts pour les biens :",e)}
+  try{if(!SOA.length)await loadSo()}catch(e){console.warn("Chargement des soldes pour les biens :",e)}
   const data=PROP_DATA.map(p=>({p,...propNet(p)}));
   const total=data.reduce((a,x)=>a+x.net,0);
   $("propertyTotal").textContent=money(total);
