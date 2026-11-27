@@ -266,7 +266,8 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
  <label>Date<input id="dcaDate" type="date"></label>
  <label>Montant investi (€)<input id="dcaAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="30"></label>
  <label>Quantité BTC<input id="dcaQty" type="number" min="0" step="0.00000001" inputmode="decimal" placeholder="0,0003"></label>
- <label>Prix du BTC (€)<input id="dcaPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 78000"></label>
+ <label>Prix d’achat du BTC (€)<input id="dcaPrice" type="number" readonly step="0.01" placeholder="Calculé automatiquement"></label>
+ <p class="mu" style="margin-top:-6px">Calcul automatique : montant investi ÷ quantité de BTC achetée.</p>
  <button type="button" class="btn" id="dcaSave">Enregistrer l’achat</button>
  <button type="button" class="btn alt" id="dcaClose">Annuler</button>
 </dialog>
@@ -1355,11 +1356,18 @@ $("dcaOpen").onclick=()=>{
  $("dcaDialog").showModal();
 };
 $("dcaClose").onclick=()=>$("dcaDialog").close();
+function updateDcaPurchasePrice(){
+ const amount=Number(String($("dcaAmount").value).replace(",","."));
+ const qty=Number(String($("dcaQty").value).replace(",","."));
+ $("dcaPrice").value=Number.isFinite(amount)&&amount>0&&Number.isFinite(qty)&&qty>0?(amount/qty).toFixed(2):"";
+}
+$("dcaAmount").addEventListener("input",updateDcaPurchasePrice);
+$("dcaQty").addEventListener("input",updateDcaPurchasePrice);
 $("dcaSave").onclick=async()=>{
- const account=pierreCurrentAccount(),date=$("dcaDate").value,amount=Number(String($("dcaAmount").value).replace(",",".")),qty=Number(String($("dcaQty").value).replace(",",".")),price=Number(String($("dcaPrice").value).replace(",","."));
+ const account=pierreCurrentAccount(),date=$("dcaDate").value,amount=Number(String($("dcaAmount").value).replace(",",".")),qty=Number(String($("dcaQty").value).replace(",",".")),price=amount/qty;
  if(!account){toast("Le compte courant Pierre est introuvable dans Paramètres");return}
  if(!date||!Number.isFinite(amount)||amount<=0){toast("Date et montant positif requis");return}
- if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<=0){toast("Renseigne une quantité BTC et un prix unitaire positifs");return}
+ if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<=0){toast("Renseigne une quantité de BTC positive");return}
  const label="Achat DCA-Crypto BTC";
  const key="DCA-CRYPTO|"+account.id+"|"+date+"|"+amount.toFixed(2)+"|"+qty.toFixed(8)+"|"+price.toFixed(2);
  const note=`DCA-Crypto | BTC=${qty.toFixed(8)} | PRIX=${price.toFixed(2)} EUR`;
