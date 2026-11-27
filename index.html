@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Comptes">
-<title>Comptes</title>
+<title>Comptes v23</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0f4c5c">
@@ -144,10 +144,11 @@ button:focus-visible,li:focus-visible,input:focus-visible{outline:2px solid var(
   </div>
  </div>
  <div id="v7" hidden>
-  <h2>Paramètres</h2><div class="subs"><button id="st1" class="on">Catégories</button><button id="st2">Règles</button><button id="st3">Attribution des comptes</button></div>
+  <h2>Paramètres</h2><div class="subs"><button id="st1" class="on">Catégories</button><button id="st2">Règles</button><button id="st3">Attribution des comptes</button><button id="st4">Doublons</button></div>
   <div id="sv1"><h3 style="margin:14px 0 4px">Catégories et sous-catégories</h3><p class="mu">Appuyez sur une catégorie pour gérer ses sous-catégories.</p><button class="btn" id="ca1">+ Nouvelle catégorie</button><ul id="cl"></ul></div>
   <div id="sv2" hidden><h3 style="margin:14px 0 4px">Règles d’affectation automatique</h3><p class="mu">Si le libellé contient le mot-clé, la ligne reçoit cette catégorie (le mot-clé le plus long l’emporte).</p><input id="rf" placeholder="Rechercher une règle"><button class="btn" id="ra">+ Nouvelle règle</button><button class="btn alt" id="rap">Appliquer les règles aux lignes à compléter</button><ul id="rl"></ul></div>
   <div id="sv3" hidden><h3 style="margin:14px 0 4px">Attribution des comptes</h3><p class="mu">Choisis à qui appartient chaque compte. Les modifications sont conservées sur cet appareil.</p><div id="ownerRules"></div></div>
+  <div id="sv4" hidden><h3 style="margin:14px 0 4px">Détection des doublons</h3><p class="mu">Recherche les opérations du même compte avec le même montant et le même libellé, à une date identique ou proche (17 jours maximum). Les rapprochements sont des suggestions : aucune ligne n’est supprimée automatiquement.</p><button class="btn" id="dupScan">Analyser les opérations</button><p class="mu" id="dupStatus" aria-live="polite">Lance une analyse pour afficher les groupes suspects.</p><div id="dupResults"></div></div>
  </div>
  <div id="v8" hidden>
   <h2>Impôts</h2>
@@ -437,8 +438,40 @@ $("pv").onclick=()=>{M--;if(M<0){M=11;Y--}renderCa();loadView()};
 $("nx").onclick=()=>{M++;if(M>11){M=0;Y++}renderCa();loadView()};
 function tab(n){[1,2,4,5,6,7,8,9,10,11,12].forEach(v=>{if($("v"+v))$("v"+v).hidden=v!==n;if($("t"+v))$("t"+v).classList.toggle("on",v===n)})}
 $("t6").onclick=()=>{tab(6);loadPr()};$("t7").onclick=async()=>{tab(7);try{await loadRef();renderCat();renderOwnerSettings()}catch(e){toast("Erreur de chargement des paramètres : "+e.message)}};$("t8").onclick=()=>{tab(8);loadImp()};
-$("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};
-function settingsSub(n){[1,2,3].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).classList.toggle("on",i===n)})}
+$("st1").onclick=()=>settingsSub(1);$("st2").onclick=()=>settingsSub(2);$("st3").onclick=()=>{settingsSub(3);renderOwnerSettings()};$("st4").onclick=()=>settingsSub(4);
+function settingsSub(n){[1,2,3,4].forEach(i=>{$("sv"+i).hidden=i!==n;$("st"+i).classList.toggle("on",i===n)})}
+const dupNorm=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+const dupDateMs=s=>{const d=new Date(String(s||"")+"T12:00:00");return isNaN(d)?NaN:d.getTime()};
+async function scanDuplicates(){
+ const status=$("dupStatus"),out=$("dupResults");status.textContent="Analyse des opérations en cours…";out.innerHTML="";$("dupScan").disabled=true;
+ try{
+  const rows=await all(()=>SB.from("transactions").select("id,compte_id,date,libelle,montant,categorie,sous_categorie,note").order("date").order("id"));
+  const buckets=new Map();
+  for(const r of rows){const label=dupNorm(r.libelle),amount=Math.round(Number(r.montant||0)*100);if(!r.compte_id||!label||!amount||!r.date)continue;
+   const key=[r.compte_id,amount,label].join("|");if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(r)}
+  const groups=[];
+  for(const list of buckets.values()){
+   list.sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
+   let cluster=[];
+   for(const r of list){if(!cluster.length||((dupDateMs(r.date)-dupDateMs(cluster[0].date))/86400000)<=17)cluster.push(r);else{if(cluster.length>1)groups.push(cluster);cluster=[r]}}
+   if(cluster.length>1)groups.push(cluster);
+  }
+  groups.sort((a,b)=>a[0].date.localeCompare(b[0].date));
+  if(!groups.length){status.textContent=rows.length+" opérations analysées : aucun groupe suspect détecté.";return}
+  status.textContent=rows.length+" opérations analysées · "+groups.length+" groupes à vérifier · "+groups.reduce((n,g)=>n+g.length-1,0)+" doublon(s) potentiel(s).";
+  out.innerHTML=groups.map((g,i)=>{
+   const acct=CN(g[0].compte_id)||"Compte inconnu",total=(Number(g[0].montant)||0).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
+   return `<section class="card" style="cursor:default" data-dupg="${i}"><h3>${esc(acct)} · ${esc(total)}</h3><p class="mu" style="margin:0 0 8px">${esc(g[0].libelle)} · ${g.length} opérations entre le ${g[0].date.split("-").reverse().join("/")} et le ${g[g.length-1].date.split("-").reverse().join("/")}</p>${g.map((r,j)=>`<div style="border-top:1px solid var(--ln);padding:9px 0;display:flex;gap:10px;align-items:center;justify-content:space-between"><div style="min-width:0"><b>${r.date.split("-").reverse().join("/")}</b><div class="mu">${esc(r.libelle)}${r.categorie?" · "+esc(r.categorie):""}${r.sous_categorie?" / "+esc(r.sous_categorie):""}</div><div class="mu">ID ${esc(String(r.id))}${j===0?" · première ligne du groupe":""}</div></div><button class="okb" data-dupdelete="${esc(String(r.id))}">Supprimer</button></div>`).join("")}</section>`;
+  }).join("");
+ }catch(e){status.textContent="Erreur pendant l’analyse : "+e.message}
+ finally{$("dupScan").disabled=false}
+}
+$("dupScan").onclick=scanDuplicates;
+$("dupResults").addEventListener("click",async ev=>{const b=ev.target.closest("[data-dupdelete]");if(!b)return;const id=b.dataset.dupdelete;
+ if(!confirm("Supprimer définitivement cette opération de la base ? Cette action ne peut pas être annulée."))return;
+ b.disabled=true;try{const{error}=await SB.from("transactions").delete().eq("id",id);if(error)throw error;toast("Opération supprimée");await scanDuplicates();await loadRef();await loadView()}catch(e){b.disabled=false;toast("Suppression impossible : "+e.message)}
+});
+
 $("t9").onclick=()=>{tab(9);loadDashboard()};
 $("t10").onclick=()=>{tab(10);loadWealth()};
 $("t11").onclick=()=>{tab(11);loadInvestments()};
@@ -740,25 +773,41 @@ async function impBank(buf,wb0,ws0,cid0){
  const wb=wb0||XLSX.read(buf,{type:"array"}),ws=ws0||wb.Sheets[wb.SheetNames[1]],cid=cid0||CID();
  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
  const hi=rows.findIndex(r=>r[0]==="Date");if(hi<0)throw new Error("Colonne « Date » introuvable (2e onglet attendu)");
- const num=v=>{const n=parseFloat(String(v??"").replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n};
+ const num=v=>{const n=parseFloat(String(v??"").replace(/[\s\u00a0\u202f]/g,"").replace(",","."));return isNaN(n)?0:n};
+ const parseDate=v=>{
+  if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);
+  if(typeof v==="number"&&Number.isFinite(v))return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+  if(typeof v==="string"){const s=v.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0")}
+  return "";
+ };
+ const normLabel=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/\s+/g," ").trim();
  const L=[];
- for(const r of rows.slice(hi+1)){const rawDate=r[0];let date="";
-  if(typeof rawDate==="number"&&Number.isFinite(rawDate))date=new Date(Math.round((rawDate-25569)*864e5)).toISOString().slice(0,10);
-  else if(typeof rawDate==="string"){const v=rawDate.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v;else{const m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)date=m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0")}}
-  if(!date)continue;const montant=Math.round((num(r[3])+num(r[4]))*100)/100;
-  if(!montant||!r[2])continue;L.push({date,libelle:String(r[2]).trim(),montant})}
+ for(const r of rows.slice(hi+1)){
+  const date=parseDate(r[0]),dateValeur=parseDate(r[1]);
+  const libelle=String(r[2]||"").trim(),montant=Math.round((num(r[3])+num(r[4]))*100)/100;
+  if(!date||!montant||!libelle)continue;
+  L.push({date,dateValeur,libelle,montant});
+ }
  if(!L.length)throw new Error("Aucune opération trouvée");
  L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
- const ex=await all(()=>SB.from("transactions").select("id,date,montant").eq("compte_id",cid).gte("date",L[0].date).lte("date",L[L.length-1].date).order("id"));
- const have=new Map();for(const e of ex){const k=e.date+"|"+Number(e.montant).toFixed(2);have.set(k,(have.get(k)||0)+1)}
- const seen=new Map(),N=[],cnt={regle:0,suggeree:0,a_completer:0};
- for(const l of L){const k=l.date+"|"+l.montant.toFixed(2),i=seen.get(k)||0;seen.set(k,i+1);
-  if(i<(have.get(k)||0))continue;
+ // L'import historique utilisait parfois « Valeur ». On recherche donc les
+ // transactions existantes sur les deux dates et on les rapproche aussi par libellé.
+ const dates=L.flatMap(l=>[l.date,l.dateValeur].filter(Boolean));
+ const minDate=dates.reduce((a,b)=>a<b?a:b),maxDate=dates.reduce((a,b)=>a>b?a:b);
+ const ex=await all(()=>SB.from("transactions").select("id,date,montant,libelle").eq("compte_id",cid).gte("date",minDate).lte("date",maxDate).order("id"));
+ const used=new Set(),N=[],cnt={regle:0,suggeree:0,a_completer:0};
+ for(const l of L){
+  const candidates=new Set([l.date,l.dateValeur].filter(Boolean)),label=normLabel(l.libelle);
+  const match=ex.find(e=>!used.has(e.id)&&candidates.has(e.date)&&Math.round(Number(e.montant)*100)===Math.round(l.montant*100)&&normLabel(e.libelle)===label);
+  if(match){used.add(match.id);continue}
   const c=classify(l.libelle);cnt[c.statut_cat]++;
-  N.push({...l,...c,compte_id:cid,cle_doublon:KPc(cid)+k.replace("|","|"+l.libelle+"|")+"|b"+i})}
+  const k=l.date+"|"+l.montant.toFixed(2),i=N.filter(x=>x.date===l.date&&x.montant===l.montant&&normLabel(x.libelle)===label).length;
+  N.push({...l,...c,compte_id:cid,cle_doublon:KPc(cid)+k.replace("|","|"+l.libelle+"|")+"|b"+i});
+ }
  if(N.length)await ins(N,"cle_doublon");
  if(!cid0){await loadRef();await counts()}
- const msg=(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer);if(cid0)return msg;log(msg)}
+ const msg=(L.length+" lignes lues · "+(L.length-N.length)+" déjà présentes · "+N.length+" ajoutées\nPar règle : "+cnt.regle+" · suggérées : "+cnt.suggeree+" · à compléter : "+cnt.a_completer);if(cid0)return msg;log(msg)
+}
 const num2=v=>{const n=parseFloat(String(v==null?"":v).replace(/[\s\u00a0\u202f]/g,"").replace(",","."));return isNaN(n)?0:n};
 const byNum=n=>CPT.find(c=>c.numero===n),byNom=n=>CPT.find(c=>c.nom===n),ck=c=>c.numero||"cpt:"+c.id;
 async function putSolde(c,date,solde){const{error}=await SB.from("soldes").upsert({numero:ck(c),date,solde},{onConflict:"numero,date"});if(error)throw error}
